@@ -161,7 +161,7 @@
     margin-bottom:6px;
     font-weight:600;
   }
-  input[type=text], select{
+  input[type=text], select, textarea{
     width:100%;
     background:var(--panel-2);
     border:1px solid var(--line);
@@ -171,7 +171,8 @@
     font-size:15px;
     font-family:inherit;
   }
-  input[type=text]:focus, select:focus{outline:2px solid var(--flame);outline-offset:1px;}
+  textarea{resize:vertical;}
+  input[type=text]:focus, select:focus, textarea:focus{outline:2px solid var(--flame);outline-offset:1px;}
 
   .newtote-row{display:flex;gap:8px;}
   .newtote-row input{flex:1;}
@@ -188,6 +189,7 @@
     font-family:'Rajdhani',sans-serif;
     letter-spacing:0.03em;
   }
+  .th-badge{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:var(--go);}
 
   .toast{
     position:fixed;
@@ -262,44 +264,19 @@
   .price-head img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:8px;flex-shrink:0;}
   .price-head .ptitle{font-size:13px;font-weight:600;line-height:1.3;}
 
-  .resale-block{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
-  .resale-link{
-    display:flex;justify-content:space-between;align-items:center;
+  .resale-block{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+  .resale-block .offer-row{
     background:linear-gradient(135deg, rgba(255,91,31,0.16), rgba(255,91,31,0.05));
     border:1px solid rgba(255,91,31,0.45);
     border-radius:10px;
     padding:13px 14px;
-    text-decoration:none;
-    color:var(--chrome);
-    font-family:'Rajdhani',sans-serif;
-    font-weight:700;
-    font-size:16px;
-    text-transform:uppercase;
-    letter-spacing:0.02em;
   }
-  .resale-link .sub{
-    display:block;
-    font-family:'Inter',sans-serif;
-    font-weight:400;
-    text-transform:none;
-    letter-spacing:0;
-    font-size:11px;
-    color:var(--muted);
-    margin-top:2px;
+  .resale-block .offer-row .merchant{
+    font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;
+    text-transform:uppercase;letter-spacing:0.02em;
   }
-  .resale-link .go-arrow{color:var(--flame);font-size:18px;}
 
-  .other-offers{margin-top:4px;}
-  .other-offers summary{
-    cursor:pointer;
-    font-size:12px;
-    color:var(--muted);
-    padding:6px 0;
-    list-style:none;
-  }
-  .other-offers summary::-webkit-details-marker{display:none;}
-  .other-offers summary::before{content:"▸ ";}
-  .other-offers[open] summary::before{content:"▾ ";}
+  .other-offers-block{display:flex;flex-direction:column;margin-bottom:8px;}
   .offer-row{
     display:flex;justify-content:space-between;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);
@@ -309,12 +286,23 @@
   .offer-row .merchant{font-weight:600;}
   .offer-row .cond{color:var(--muted);font-size:11px;margin-left:6px;}
   .offer-row .price{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--track-yellow);}
-  .quicklinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
-  .quicklinks a{
-    background:var(--panel-2);border:1px solid var(--line);color:var(--chrome);
-    font-size:12px;font-weight:600;padding:8px 12px;border-radius:8px;
-    text-decoration:none;
+  .offer-row .ship{font-family:'Inter',sans-serif;font-weight:400;font-size:10px;color:var(--muted);}
+  .offer-row.unavailable{color:var(--muted);}
+  .offer-row.unavailable .cond{margin-left:0;}
+  .offer-row.link-only .cond{color:var(--flame);}
+
+  .stats-row{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+    margin:12px 0 4px;
   }
+  .stats-row > div{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:8px 6px;text-align:center;
+    font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--chrome);
+  }
+  .stat-label{display:block;font-family:'Inter',sans-serif;font-weight:600;
+    font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:2px;}
+
   .price-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
   .spinner-text{color:var(--muted);font-size:13px;padding:6px 0;}
   .price-badge{
@@ -382,6 +370,15 @@
     font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;
     text-transform:uppercase;font-family:'Rajdhani',sans-serif;flex-shrink:0;
   }
+  .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .checkbox-row{
+    display:flex;align-items:center;gap:8px;
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;padding:11px 12px;font-size:14px;color:var(--chrome);
+    cursor:pointer;
+  }
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--flame);}
+  .th-check{display:flex;flex-direction:column;}
 </style>
 </head>
 <body>
@@ -433,11 +430,51 @@
         <span id="ocrSuggestText"></span>
         <button id="btnUseOcr" type="button">Use this</button>
       </div>
+      <div class="ocr-suggest hidden" id="ocrFieldSuggest">
+        <span id="ocrFieldSuggestText"></span>
+        <button id="btnUseOcrFields" type="button">Fill these in</button>
+      </div>
 
       <label class="field" style="margin-top:16px;">
-        <span>Car name / series (optional)</span>
-        <input type="text" id="fName" placeholder="e.g. '67 Camaro — HW Flames" />
+        <span>Vehicle name</span>
+        <input type="text" id="fName" placeholder="e.g. Nissan Silvia S15" />
       </label>
+
+      <div class="field-grid">
+        <label class="field">
+          <span>Series</span>
+          <input type="text" id="fSeries" placeholder="e.g. Boulevard" />
+        </label>
+        <label class="field">
+          <span>Release year</span>
+          <input type="text" id="fYear" placeholder="e.g. 2024" inputmode="numeric" />
+        </label>
+      </div>
+      <div class="field-grid">
+        <label class="field">
+          <span>Collector #</span>
+          <input type="text" id="fCollectorNum" placeholder="e.g. 73 or 118/250" />
+        </label>
+        <label class="field">
+          <span>Variant / color</span>
+          <input type="text" id="fVariant" placeholder="e.g. Blue" />
+        </label>
+      </div>
+      <div class="field-grid">
+        <label class="field">
+          <span>Premium / Mainline</span>
+          <select id="fTier">
+            <option value="">—</option>
+            <option value="Mainline">Mainline</option>
+            <option value="Premium">Premium</option>
+          </select>
+        </label>
+        <label class="field th-check">
+          <span>&nbsp;</span>
+          <label class="checkbox-row"><input type="checkbox" id="fTreasureHunt"> Treasure Hunt</label>
+        </label>
+      </div>
+
       <label class="field">
         <span>Tote / Location</span>
         <select id="fTote"></select>
@@ -447,8 +484,8 @@
         <button class="btn btn-ghost btn-sm" id="btnAddTote">Add</button>
       </div>
       <label class="field">
-        <span>Label / notes (optional)</span>
-        <input type="text" id="fLabel" placeholder="e.g. Shelf B, Treasure Hunt" />
+        <span>Label / notes</span>
+        <textarea id="fLabel" rows="3" placeholder="Auto-generated once enough info is filled in"></textarea>
       </label>
       <button class="btn btn-flame btn-block" id="btnSaveItem">Save to Collection</button>
     </div>
@@ -500,9 +537,16 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
+/* ---------- config ---------- */
+// Fill this in once you deploy the eBay backend Worker — see worker/README.md.
+// Leave blank to run without live eBay pricing (the app degrades gracefully).
+const EBAY_WORKER_URL = ""; // e.g. "https://mannys-hotwheels-ebay.you.workers.dev"
+
+const PRICE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 /* ---------- storage: tiny IndexedDB wrapper ---------- */
 const DB_NAME = "mannys_hw_db";
-const DB_VER = 1;
+const DB_VER = 2;
 let db;
 
 function openDB(){
@@ -517,6 +561,13 @@ function openDB(){
       if(!d.objectStoreNames.contains("totes")){
         d.createObjectStore("totes",{keyPath:"name"});
       }
+      // added in v2: pricing cache (24h TTL) and permanent ID cache
+      if(!d.objectStoreNames.contains("priceCache")){
+        d.createObjectStore("priceCache",{keyPath:"query"});
+      }
+      if(!d.objectStoreNames.contains("idCache")){
+        d.createObjectStore("idCache",{keyPath:"barcode"});
+      }
     };
     req.onsuccess = (e)=>{db=e.target.result; resolve(db);};
     req.onerror = (e)=>reject(e);
@@ -527,6 +578,13 @@ function getAll(store){
   return new Promise((resolve,reject)=>{
     const r = tx(store,"readonly").getAll();
     r.onsuccess=()=>resolve(r.result);
+    r.onerror=(e)=>reject(e);
+  });
+}
+function getOne(store,key){
+  return new Promise((resolve,reject)=>{
+    const r = tx(store,"readonly").get(key);
+    r.onsuccess=()=>resolve(r.result || null);
     r.onerror=(e)=>reject(e);
   });
 }
@@ -610,14 +668,21 @@ function escapeHtml(s){
   return (s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 async function saveItem(){
-  const barcode = document.getElementById("fBarcode").value.trim();
-  const name = document.getElementById("fName").value.trim();
+  const profile = readFormProfile();
+  const barcode = profile.barcode;
   const tote = document.getElementById("fTote").value || "Unsorted";
   const label = document.getElementById("fLabel").value.trim();
   if(!barcode){ toast("Scan or enter a barcode first", true); return; }
   const item = {
     id: barcode + "_" + Date.now(),
-    barcode, name, tote, label,
+    barcode, tote, label,
+    name: profile.name,
+    series: profile.series,
+    year: profile.year,
+    collectorNum: profile.collectorNum,
+    variant: profile.variant,
+    tier: profile.tier,
+    treasureHunt: profile.treasureHunt,
     createdAt: Date.now()
   };
   if(draftPrice && draftPrice.barcode === barcode && draftPrice.lowest != null){
@@ -628,12 +693,27 @@ async function saveItem(){
   if(draftPhotos.front) item.photoFront = draftPhotos.front;
   if(draftPhotos.back) item.photoBack = draftPhotos.back;
   await put("items", item);
+
+  // remember this barcode's identification permanently for next time it's scanned
+  if(profile.name || profile.series || profile.year || profile.collectorNum){
+    await put("idCache", {
+      barcode,
+      name: profile.name, series: profile.series, year: profile.year,
+      collectorNum: profile.collectorNum, variant: profile.variant,
+      tier: profile.tier, treasureHunt: profile.treasureHunt
+    });
+  }
+
   await loadItems();
   renderRecent();
   toast("Saved to "+tote);
-  document.getElementById("fBarcode").value="";
-  document.getElementById("fName").value="";
-  document.getElementById("fLabel").value="";
+  ["fBarcode","fName","fSeries","fYear","fCollectorNum","fVariant","fLabel"].forEach(id=>{
+    const el = document.getElementById(id);
+    el.value = "";
+    delete el.dataset.userEdited;
+  });
+  document.getElementById("fTier").value = "";
+  document.getElementById("fTreasureHunt").checked = false;
   document.getElementById("pricePanel").classList.add("hidden");
   document.getElementById("pricePanel").innerHTML="";
   document.getElementById("dupeBanner").classList.add("hidden");
@@ -667,11 +747,12 @@ function itemRowHtml(it){
   const thumb = it.photoFront
     ? `<img src="${it.photoFront}" alt="" class="row-thumb" />`
     : "";
+  const thBit = it.treasureHunt ? `<span class="badge th-badge">TH</span>` : (it.tier ? `<span class="badge">${escapeHtml(it.tier)}</span>` : "");
   return `<div class="item-row" data-id="${escapeHtml(it.id)}">
     ${thumb}
     <div class="item-main">
-      <div class="name">${escapeHtml(it.name || it.barcode)}</div>
-      <div class="meta">${escapeHtml(it.barcode)} · <span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label)):""}${priceBit}</div>
+      <div class="name">${escapeHtml(it.name || it.barcode)} ${thBit}</div>
+      <div class="meta">${escapeHtml(it.barcode)} · <span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label.split("\n")[0])):""}${priceBit}</div>
     </div>
     <div class="item-actions">
       <button class="icon-btn danger" data-action="del" title="Delete">✕</button>
@@ -694,7 +775,10 @@ function renderCollection(){
   let list = items.filter(it=>{
     const matchesSearch = !search || (it.name||"").toLowerCase().includes(search)
       || it.barcode.toLowerCase().includes(search)
-      || (it.label||"").toLowerCase().includes(search);
+      || (it.label||"").toLowerCase().includes(search)
+      || (it.series||"").toLowerCase().includes(search)
+      || (it.collectorNum||"").toLowerCase().includes(search)
+      || (it.variant||"").toLowerCase().includes(search);
     const matchesTote = !toteFilter || it.tote===toteFilter;
     return matchesSearch && matchesTote;
   });
@@ -780,43 +864,271 @@ document.getElementById("importFile").addEventListener("change", async (e)=>{
   e.target.value="";
 });
 
-/* ---------- price comparison ---------- */
+/* ---------- canonical identification ---------- */
+
+function readFormProfile(){
+  return {
+    barcode: document.getElementById("fBarcode").value.trim(),
+    name: document.getElementById("fName").value.trim(),
+    series: document.getElementById("fSeries").value.trim(),
+    year: document.getElementById("fYear").value.trim(),
+    collectorNum: document.getElementById("fCollectorNum").value.trim(),
+    variant: document.getElementById("fVariant").value.trim(),
+    tier: document.getElementById("fTier").value,
+    treasureHunt: document.getElementById("fTreasureHunt").checked,
+    ocrText: ocrCombinedText
+  };
+}
+
+// One canonical search string used for every marketplace query — built from
+// whatever structured info we actually have, preferring specific fields
+// (name/series/year/variant) over the bare barcode, since the barcode alone
+// often only identifies a whole assortment, not the exact casting.
+function canonicalQueryString(profile){
+  const parts = ["Hot Wheels"];
+  if(profile.year) parts.push(profile.year);
+  if(profile.name) parts.push(profile.name);
+  if(profile.series) parts.push(profile.series);
+  if(profile.variant) parts.push(profile.variant);
+  if(profile.tier==="Premium") parts.push("Premium");
+  if(profile.treasureHunt) parts.push("Treasure Hunt");
+  const built = parts.join(" ").trim();
+  if(built !== "Hot Wheels") return built;
+  // nothing structured yet — fall back to whatever OCR caught, then barcode
+  const ocrGuess = (profile.ocrText||"").split("\n").map(l=>l.trim())
+    .filter(l=>l.length>=3 && l.length<=40 && /[a-zA-Z]/.test(l))
+    .sort((a,b)=>b.length-a.length)[0];
+  if(ocrGuess) return "Hot Wheels " + ocrGuess;
+  return profile.barcode ? ("Hot Wheels " + profile.barcode) : "Hot Wheels";
+}
+
+function buildAutoLabel(profile){
+  if(!profile.name && !profile.year) return null; // not enough to build a meaningful label
+  const line1 = (profile.year ? profile.year + " " : "") + "Hot Wheels";
+  const line2 = profile.name || null;
+  const seriesBits = [];
+  if(profile.series) seriesBits.push(profile.series);
+  if(profile.collectorNum) seriesBits.push("#"+profile.collectorNum);
+  const line3 = seriesBits.length ? seriesBits.join(" ") : null;
+  const line4 = profile.treasureHunt ? "Treasure Hunt" : (profile.tier || null);
+  return [line1, line2, line3, line4].filter(Boolean).join("\n");
+}
+
+// Auto-fills the Label field once there's enough identification to build a
+// meaningful one — but never overwrites text the user already typed there.
+function maybeAutoLabel(){
+  const labelField = document.getElementById("fLabel");
+  if(labelField.dataset.userEdited === "true") return;
+  const profile = readFormProfile();
+  const auto = buildAutoLabel(profile);
+  if(auto) labelField.value = auto;
+}
+document.getElementById("fLabel").addEventListener("input", (e)=>{
+  e.target.dataset.userEdited = "true"; // once they type, stop auto-overwriting
+});
+["fName","fSeries","fYear","fCollectorNum","fVariant","fTier","fTreasureHunt"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", maybeAutoLabel);
+});
+
+/* ---------- pricing engine (provider-based, 5 fixed slots) ---------- */
 let draftPrice = null;
 
-function resaleLinks(query){
-  const q = encodeURIComponent(query);
-  return [
-    {label:"eBay — sold listings", sub:"real resale value", url:`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`},
-    {label:"eBay — active listings", sub:"what it's listed for now", url:`https://www.ebay.com/sch/i.html?_nkw=${q}`},
-    {label:"Amazon", sub:"", url:`https://www.amazon.com/s?k=${q}`}
-  ];
-}
-function otherLinks(query){
-  const q = encodeURIComponent(query);
-  return [
-    {label:"Mercari", url:`https://www.mercari.com/search/?keyword=${q}`},
-    {label:"Google Shopping", url:`https://www.google.com/search?tbm=shop&q=${q}`}
-  ];
+function fetchWithTimeout(url, ms, opts){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  return fetch(url, {...(opts||{}), signal: controller.signal})
+    .then(res => { clearTimeout(timer); if(!res.ok) throw new Error("bad status " + res.status); return res.json(); })
+    .catch(err => { clearTimeout(timer); throw err; });
 }
 
-function resaleLinksHtml(query){
-  return resaleLinks(query).map(l=>`
-    <a class="resale-link" href="${l.url}" target="_blank" rel="noopener">
-      <span>${l.label}${l.sub?(`<span class="sub">${l.sub}</span>`):""}</span>
-      <span class="go-arrow">↗</span>
-    </a>`).join("");
+async function fetchJsonWithFallback(targetUrl){
+  const urls = [
+    targetUrl,
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl),
+    "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(targetUrl),
+    "https://corsproxy.io/?url=" + encodeURIComponent(targetUrl)
+  ];
+  try{
+    return await Promise.any(urls.map(u => fetchWithTimeout(u, 6000)));
+  }catch(err){
+    return null;
+  }
 }
-function otherLinksHtml(query){
-  return `<div class="quicklinks">${otherLinks(query).map(l=>`<a href="${l.url}" target="_blank" rel="noopener">${l.label} ↗</a>`).join("")}</div>`;
+
+// ---- provider: eBay (real API, via the Cloudflare Worker backend) ----
+async function ebayProvider(query){
+  if(!EBAY_WORKER_URL) return { available:false, reason:"not_configured", results:[] };
+  try{
+    const url = EBAY_WORKER_URL.replace(/\/$/,"") + "/ebay-search?q=" + encodeURIComponent(query);
+    const data = await fetchWithTimeout(url, 8000);
+    if(data && data.error) return { available:false, reason:data.error, results:[] };
+    return { available:true, results:(data && data.results) || [] };
+  }catch(err){
+    return { available:false, reason:"unreachable", results:[] };
+  }
+}
+
+// ---- provider: Google Shopping via SerpApi, through the same Worker.
+// This is what actually makes a real Amazon price possible — eBay and
+// Amazon both submit their catalogs to Google Shopping themselves, so this
+// surfaces real listings from both (plus Walmart/Target/etc.) in one call. ----
+async function shopProvider(query){
+  if(!EBAY_WORKER_URL) return { available:false, reason:"not_configured", results:[] };
+  try{
+    const url = EBAY_WORKER_URL.replace(/\/$/,"") + "/shop-search?q=" + encodeURIComponent(query);
+    const data = await fetchWithTimeout(url, 8000);
+    if(data && data.error) return { available:false, reason:data.error, results:[] };
+    return { available:true, results:(data && data.results) || [] };
+  }catch(err){
+    return { available:false, reason:"unreachable", results:[] };
+  }
+}
+
+// ---- provider: general retail lookup (Walmart/Target/etc. — real data,
+// via the same product database used for name auto-fill) ----
+async function otherRetailersProvider(barcode){
+  if(!barcode) return { available:false, results:[], product:null };
+  const data = await fetchJsonWithFallback(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+  const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
+  if(!product) return { available:false, results:[], product:null };
+  const results = (product.offers || [])
+    .filter(o => o.price && Number(o.price) > 0)
+    .map(o => ({
+      marketplace: o.merchant || "Unknown seller",
+      title: product.title || null,
+      price: Number(o.price),
+      shipping: 0,
+      totalCost: Number(o.price),
+      condition: o.condition || "",
+      url: o.link || null
+    }))
+    .sort((a,b)=>a.totalCost - b.totalCost);
+  return { available: results.length>0, results, product };
+}
+
+// Amazon fallback: link-only, used only when no real Amazon price was
+// found via Google Shopping. Never scraped, never faked as a price.
+function amazonLinkSlot(query){
+  return {
+    marketplace: "Amazon",
+    linkOnly: true,
+    url: `https://www.amazon.com/s?k=${encodeURIComponent(query)}`
+  };
+}
+
+async function getCachedPricing(query){
+  try{
+    const cached = await getOne("priceCache", query);
+    if(cached && (Date.now() - cached.cachedAt) < PRICE_CACHE_TTL_MS) return cached.payload;
+  }catch(err){ /* cache miss is fine */ }
+  return null;
+}
+async function setCachedPricing(query, payload){
+  try{ await put("priceCache", { query, payload, cachedAt: Date.now() }); }catch(err){ /* non-fatal */ }
+}
+
+function median(nums){
+  if(!nums.length) return null;
+  const s = [...nums].sort((a,b)=>a-b);
+  const mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+
+async function runPricingEngine(profile){
+  const query = canonicalQueryString(profile);
+
+  const cached = await getCachedPricing(query);
+  if(cached) return { ...cached, fromCache:true, query };
+
+  // run every real data source in parallel — one slow/unavailable source
+  // never blocks the others (requirement: graceful degradation)
+  const [ebayRes, shopRes, otherRes] = await Promise.allSettled([
+    ebayProvider(query),
+    shopProvider(query),
+    otherRetailersProvider(profile.barcode)
+  ]);
+
+  const ebay = ebayRes.status === "fulfilled" ? ebayRes.value : { available:false, results:[] };
+  const shop = shopRes.status === "fulfilled" ? shopRes.value : { available:false, results:[] };
+  const other = otherRes.status === "fulfilled" ? otherRes.value : { available:false, results:[], product:null };
+
+  // slot 1: eBay — prefer the dedicated Browse API (most precise), fall
+  // back to an eBay listing surfaced via Google Shopping if that's all we have
+  const shopEbay = shop.results.find(r => /ebay/i.test(r.marketplace));
+  const slot1 = (ebay.available && ebay.results.length)
+    ? ebay.results[0]
+    : (shopEbay || { marketplace:"eBay", unavailable:true, message:"No verified eBay listing found" });
+
+  // slot 2: Amazon — a REAL price if Google Shopping surfaced one, since
+  // Amazon submits its own catalog there; otherwise a plain search link
+  const shopAmazon = shop.results.find(r => /amazon/i.test(r.marketplace));
+  const slot2 = shopAmazon || amazonLinkSlot(query);
+
+  // slots 3-5: three lowest verified prices from everything else —
+  // merge Google Shopping (minus whatever filled slots 1/2) with the
+  // retailer-lookup results, dedupe by marketplace+price, sort, take 3
+  const usedShopUrls = new Set([shopEbay && shopEbay.url, shopAmazon && shopAmazon.url].filter(Boolean));
+  const remainingShop = shop.results.filter(r => !usedShopUrls.has(r.url) && !/ebay|amazon/i.test(r.marketplace));
+  const merged = [...remainingShop, ...other.results];
+  const seen = new Set();
+  const deduped = merged.filter(r=>{
+    const key = r.marketplace + "|" + r.totalCost;
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  }).sort((a,b)=>a.totalCost - b.totalCost);
+
+  const slots345 = deduped.slice(0,3);
+  while(slots345.length < 3){
+    slots345.push({ marketplace:"—", unavailable:true, message:"No additional verified listings found" });
+  }
+
+  const numericPrices = [
+    ...(slot1.totalCost!=null ? [slot1.totalCost] : []),
+    ...(slot2.totalCost!=null ? [slot2.totalCost] : []),
+    ...slots345.filter(s=>s.totalCost!=null).map(s=>s.totalCost)
+  ];
+  const stats = numericPrices.length ? {
+    lowest: Math.min(...numericPrices),
+    highest: Math.max(...numericPrices),
+    average: Number((numericPrices.reduce((a,b)=>a+b,0)/numericPrices.length).toFixed(2)),
+    median: median(numericPrices)
+  } : null;
+
+  const payload = {
+    slots: [slot1, slot2, ...slots345],
+    stats,
+    productTitle: other.product ? other.product.title : null,
+    productImage: (other.product && other.product.images && other.product.images[0]) || null
+  };
+
+  await setCachedPricing(query, payload);
+  return { ...payload, fromCache:false, query };
+}
+
+function offerRowHtml(o){
+  if(o.unavailable){
+    return `<div class="offer-row unavailable"><span class="merchant">${escapeHtml(o.marketplace)}</span><span class="cond">${escapeHtml(o.message)}</span></div>`;
+  }
+  if(o.linkOnly){
+    return `<a class="offer-row link-only" href="${o.url}" target="_blank" rel="noopener">
+      <span class="merchant">${escapeHtml(o.marketplace)}</span>
+      <span class="cond">search link ↗</span>
+    </a>`;
+  }
+  return `<a class="offer-row" href="${o.url||'#'}" target="_blank" rel="noopener">
+    <span><span class="merchant">${escapeHtml(o.marketplace)}</span>${o.condition?(`<span class="cond">${escapeHtml(o.condition)}</span>`):""}</span>
+    <span class="price">$${o.totalCost.toFixed(2)}${o.shipping?` <span class="ship">(+$${o.shipping.toFixed(2)} ship)</span>`:""}</span>
+  </a>`;
 }
 
 document.getElementById("btnCheckPrice").addEventListener("click", checkPrices);
-document.getElementById("fBarcode").addEventListener("input", ()=>{
+document.getElementById("fBarcode").addEventListener("input", async ()=>{
   draftPrice = null;
   const panel = document.getElementById("pricePanel");
   panel.classList.add("hidden");
   panel.innerHTML = "";
   checkDuplicate();
+  await maybeApplyIdCache();
 });
 
 function checkDuplicate(){
@@ -830,89 +1142,72 @@ function checkDuplicate(){
   banner.classList.remove("hidden");
 }
 
-function fetchWithTimeout(url, ms){
-  const controller = new AbortController();
-  const timer = setTimeout(()=>controller.abort(), ms);
-  return fetch(url, {signal: controller.signal})
-    .then(res => { clearTimeout(timer); if(!res.ok) throw new Error("bad status"); return res.json(); })
-    .catch(err => { clearTimeout(timer); throw err; });
-}
-
-async function fetchJsonWithFallback(targetUrl){
-  // fire the direct call + every proxy in parallel, each capped at 6s,
-  // and use whichever comes back first — much faster than trying one at a time
-  const urls = [
-    targetUrl,
-    "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl),
-    "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(targetUrl),
-    "https://corsproxy.io/?url=" + encodeURIComponent(targetUrl)
-  ];
+// Permanent ID cache: once a barcode's identification fields have been
+// confirmed (saved) once, prefill them automatically next time it's scanned.
+async function maybeApplyIdCache(){
+  const barcode = document.getElementById("fBarcode").value.trim();
+  if(!barcode) return;
   try{
-    return await Promise.any(urls.map(u => fetchWithTimeout(u, 6000)));
-  }catch(err){
-    return null; // every attempt failed or timed out
-  }
+    const cached = await getOne("idCache", barcode);
+    if(!cached) return;
+    const setIfEmpty = (id,val)=>{ const el=document.getElementById(id); if(val && !el.value) el.value = val; };
+    setIfEmpty("fName", cached.name);
+    setIfEmpty("fSeries", cached.series);
+    setIfEmpty("fYear", cached.year);
+    setIfEmpty("fCollectorNum", cached.collectorNum);
+    setIfEmpty("fVariant", cached.variant);
+    if(cached.tier && !document.getElementById("fTier").value) document.getElementById("fTier").value = cached.tier;
+    if(cached.treasureHunt) document.getElementById("fTreasureHunt").checked = true;
+    maybeAutoLabel();
+    toast("Filled in from a previous scan of this barcode");
+  }catch(err){ /* no cache entry — fine */ }
 }
 
 async function checkPrices(){
-  const barcode = document.getElementById("fBarcode").value.trim();
+  const profile = readFormProfile();
   const panel = document.getElementById("pricePanel");
-  if(!barcode){ toast("Scan or enter a barcode first", true); return; }
+  if(!profile.barcode){ toast("Scan or enter a barcode first", true); return; }
 
   panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="spinner-text">Looking this up…</div>`;
+  panel.innerHTML = `<div class="spinner-text">Checking eBay + other sources…</div>`;
 
-  const data = await fetchJsonWithFallback(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
-  const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
-  const query = product && product.title ? product.title : ("Hot Wheels " + barcode);
+  const result = await runPricingEngine(profile);
 
-  // auto-fill the name field if empty and we got a title
+  // auto-fill the name field if empty and the retailer lookup found a title
   const nameField = document.getElementById("fName");
-  if(!nameField.value.trim() && product && product.title){
-    nameField.value = product.title;
+  if(!nameField.value.trim() && result.productTitle){
+    nameField.value = result.productTitle;
+    maybeAutoLabel();
   }
 
-  // gather secondary offers (Walmart/Target/etc.) — kept, but demoted below eBay/Amazon
-  let offers = [];
-  if(product){
-    offers = (product.offers || [])
-      .filter(o => o.price && Number(o.price) > 0)
-      .map(o => ({
-        merchant: o.merchant || "Unknown seller",
-        price: Number(o.price),
-        condition: o.condition || "",
-        link: o.link || null
-      }))
-      .sort((a,b)=>a.price - b.price);
-  }
-  const lowest = offers.length ? offers[0] : null;
-  draftPrice = lowest ? {barcode, lowest: lowest.price, lowestMerchant: lowest.merchant, checkedAt: Date.now()} : null;
+  const [slot1, slot2, ...rest] = result.slots;
+  draftPrice = (slot1 && slot1.totalCost!=null)
+    ? { barcode: profile.barcode, lowest: slot1.totalCost, lowestMerchant: "eBay", checkedAt: Date.now() }
+    : (rest.find(s=>s.totalCost!=null)
+        ? { barcode: profile.barcode, lowest: rest.find(s=>s.totalCost!=null).totalCost, lowestMerchant: rest.find(s=>s.totalCost!=null).marketplace, checkedAt: Date.now() }
+        : null);
 
-  const imgHtml = product && product.images && product.images[0]
-    ? `<img src="${product.images[0]}" alt="" />` : "";
-
-  const otherOffersHtml = offers.length
-    ? `<details class="other-offers">
-         <summary>Other listings found (${offers.length}) — not eBay/Amazon</summary>
-         ${offers.map((o,i)=>`
-           <a class="offer-row" href="${o.link||"#"}" target="_blank" rel="noopener">
-             <span><span class="merchant">${escapeHtml(o.merchant)}</span>${o.condition?(`<span class="cond">${escapeHtml(o.condition)}</span>`):""}</span>
-             <span class="price">$${o.price.toFixed(2)}</span>
-           </a>`).join("")}
-       </details>`
-    : "";
+  const imgHtml = result.productImage ? `<img src="${result.productImage}" alt="" />` : "";
+  const statsHtml = result.stats ? `
+    <div class="stats-row">
+      <div><span class="stat-label">Low</span>$${result.stats.lowest.toFixed(2)}</div>
+      <div><span class="stat-label">High</span>$${result.stats.highest.toFixed(2)}</div>
+      <div><span class="stat-label">Avg</span>$${result.stats.average.toFixed(2)}</div>
+      <div><span class="stat-label">Median</span>$${result.stats.median.toFixed(2)}</div>
+    </div>` : "";
 
   panel.innerHTML = `
-    ${product ? `
-      <div class="price-head">
-        ${imgHtml}
-        <div class="ptitle">${escapeHtml(product.title || query)}</div>
-      </div>` : `<div class="price-note">Not found in the general product database — search below directly.</div>`}
+    ${result.productTitle ? `<div class="price-head">${imgHtml}<div class="ptitle">${escapeHtml(result.productTitle)}</div></div>` : ""}
     <div class="resale-block">
-      ${resaleLinksHtml(query)}
+      ${offerRowHtml(slot1)}
+      ${offerRowHtml(slot2)}
     </div>
-    ${otherOffersHtml}
-    ${otherLinksHtml(query)}
+    <div class="other-offers-block">
+      ${rest.map(offerRowHtml).join("")}
+    </div>
+    ${statsHtml}
+    ${result.fromCache ? `<div class="price-note">Cached result (rechecks within 24h reuse this).</div>` : ""}
+    ${!EBAY_WORKER_URL ? `<div class="price-note">eBay backend isn't configured yet — see worker/README.md to enable live eBay prices.</div>` : ""}
   `;
 }
 
@@ -965,7 +1260,10 @@ function resetPhotoSlots(){
     bindPhotoInput(inputId, slotId, true);
   });
   document.getElementById("ocrSuggest").classList.add("hidden");
+  document.getElementById("ocrFieldSuggest").classList.add("hidden");
   document.getElementById("ocrNote").classList.add("hidden");
+  ocrCombinedText = "";
+  window.__ocrFieldGuesses = null;
 }
 
 function bindPhotoInput(inputId, slotId, runOcr){
@@ -984,10 +1282,14 @@ function bindPhotoInput(inputId, slotId, runOcr){
   });
 }
 
+let ocrCombinedText = ""; // accumulated across front+back, used in the canonical profile
+
 async function runOcrOnBack(dataUrl){
   const note = document.getElementById("ocrNote");
-  const suggest = document.getElementById("ocrSuggest");
-  suggest.classList.add("hidden");
+  const nameSuggest = document.getElementById("ocrSuggest");
+  const fieldSuggest = document.getElementById("ocrFieldSuggest");
+  nameSuggest.classList.add("hidden");
+  fieldSuggest.classList.add("hidden");
   if(typeof Tesseract === "undefined"){
     return; // library failed to load — skip silently, manual entry still works
   }
@@ -995,14 +1297,29 @@ async function runOcrOnBack(dataUrl){
   try{
     const result = await Tesseract.recognize(dataUrl, "eng");
     const raw = (result && result.data && result.data.text) || "";
-    // heuristic: take the longest reasonably-sized line as the likely model name
+    ocrCombinedText = (ocrCombinedText + "\n" + raw).trim();
+
+    // name candidate: longest reasonably-sized line
     const candidate = raw.split("\n")
       .map(l=>l.trim())
       .filter(l=>l.length>=3 && l.length<=40 && /[a-zA-Z]/.test(l))
       .sort((a,b)=>b.length-a.length)[0];
     if(candidate){
       document.getElementById("ocrSuggestText").textContent = `Read from photo: "${candidate}"`;
-      suggest.classList.remove("hidden");
+      nameSuggest.classList.remove("hidden");
+    }
+
+    // structured field guesses from the combined text so far
+    const guesses = extractFieldsFromText(ocrCombinedText);
+    const parts = [];
+    if(guesses.year) parts.push(`Year: ${guesses.year}`);
+    if(guesses.collectorNum) parts.push(`Collector #: ${guesses.collectorNum}`);
+    if(guesses.tier) parts.push(guesses.tier);
+    if(guesses.treasureHunt) parts.push("Treasure Hunt");
+    if(parts.length){
+      window.__ocrFieldGuesses = guesses;
+      document.getElementById("ocrFieldSuggestText").textContent = "Found: " + parts.join(" · ");
+      fieldSuggest.classList.remove("hidden");
     }
   }catch(err){
     /* OCR failed — no big deal, manual entry still works */
@@ -1011,10 +1328,39 @@ async function runOcrOnBack(dataUrl){
   }
 }
 
+// Pure regex heuristics — no AI/vision call, so this is best-effort and
+// always shown as a suggestion the user confirms, never auto-committed silently.
+function extractFieldsFromText(text){
+  const out = {};
+  const yearMatch = text.match(/\b(19[9]\d|20[0-4]\d)\b/); // 1990-2049
+  if(yearMatch) out.year = yearMatch[1];
+
+  const collectorMatch = text.match(/\b(\d{1,3}\s?\/\s?\d{2,4})\b/) // "118/250"
+    || text.match(/#\s?(\d{1,4})\b/);                                // "#73"
+  if(collectorMatch) out.collectorNum = collectorMatch[1].replace(/\s/g,"");
+
+  if(/\btreasure\s*hunt\b/i.test(text) || /\bT\.?H\.?\b/.test(text)) out.treasureHunt = true;
+  if(/\bpremium\b/i.test(text)) out.tier = "Premium";
+  else if(/\bmainline\b/i.test(text)) out.tier = "Mainline";
+
+  return out;
+}
+
 document.getElementById("btnUseOcr").addEventListener("click", ()=>{
   const text = document.getElementById("ocrSuggestText").textContent.replace(/^Read from photo: "|"$/g, "");
   document.getElementById("fName").value = text;
   document.getElementById("ocrSuggest").classList.add("hidden");
+  maybeAutoLabel();
+});
+
+document.getElementById("btnUseOcrFields").addEventListener("click", ()=>{
+  const g = window.__ocrFieldGuesses || {};
+  if(g.year) document.getElementById("fYear").value = g.year;
+  if(g.collectorNum) document.getElementById("fCollectorNum").value = g.collectorNum;
+  if(g.tier) document.getElementById("fTier").value = g.tier;
+  if(g.treasureHunt) document.getElementById("fTreasureHunt").checked = true;
+  document.getElementById("ocrFieldSuggest").classList.add("hidden");
+  maybeAutoLabel();
 });
 
 bindPhotoInput("fileFront", "slotFront", true);
@@ -1045,7 +1391,7 @@ async function startScan(){
         toast("Scanned: "+decodedText);
         if(navigator.vibrate) navigator.vibrate(80);
         checkDuplicate();
-        checkPrices();
+        maybeApplyIdCache().then(checkPrices);
         freezeScan();
       },
       ()=>{ /* ignore per-frame scan failures */ }
