@@ -1,4 +1,4 @@
-const CACHE = "mannys-hw-v7";
+const CACHE = "mannys-hw-v8";
 const ASSETS = [
   "./",
   "./index.html",

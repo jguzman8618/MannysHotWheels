@@ -304,6 +304,12 @@
     font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:2px;}
 
   .price-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  .price-note.identify-first{
+    font-size:13px;color:var(--track-yellow);margin-top:0;
+    background:rgba(244,196,15,0.08);border:1px solid rgba(244,196,15,0.35);
+    border-radius:10px;padding:12px;line-height:1.5;
+  }
+  .price-note.identify-first strong{color:var(--chrome);}
   .spinner-text{color:var(--muted);font-size:13px;padding:6px 0;}
   .price-badge{
     display:inline-block;background:rgba(61,220,132,0.12);
@@ -1041,18 +1047,69 @@ function median(nums){
   return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 
+// True if the profile has enough real signal to search marketplaces with —
+// actual words a listing title would contain, not just a barcode number.
+function hasRealIdentification(profile){
+  if(profile.name || profile.series || profile.variant) return true;
+  if(profile.ocrText && profile.ocrText.trim().split("\n").some(l=>l.trim().length>=3 && /[a-zA-Z]/.test(l))) return true;
+  return false;
+}
+
 async function runPricingEngine(profile){
-  const query = canonicalQueryString(profile);
+  let query = canonicalQueryString(profile);
+  let resolvedFromLookup = null;
+  let identifyInfo = null; // surfaced to the UI when AI photo ID was used to resolve the query
+
+  // Nothing real to search with yet (no name/series/OCR) — the barcode
+  // alone usually only identifies an assortment, and searching eBay/Amazon
+  // for the literal digits returns unrelated junk. Resolve a real search
+  // term automatically, trying progressively: retailer title lookup, then
+  // AI photo identification (including a description-based estimate for
+  // customs) — never just give up and search garbage.
+  if(!hasRealIdentification(profile)){
+    const lookup = await otherRetailersProvider(profile.barcode);
+    if(lookup.product && lookup.product.title){
+      query = "Hot Wheels " + lookup.product.title;
+      resolvedFromLookup = lookup;
+    } else {
+      const idData = await runIdentify(true); // silent — this is an automatic attempt, not a user-triggered one
+      if(idData){
+        if(idData.isCustom && idData.searchDescription){
+          query = "custom Hot Wheels " + idData.searchDescription;
+          identifyInfo = { isCustom:true, description: idData.searchDescription, confidence: idData.confidence };
+        } else if(idData.name){
+          query = ["Hot Wheels", idData.year, idData.name, idData.series, idData.variant].filter(Boolean).join(" ");
+          identifyInfo = { isCustom:false, name: idData.name, confidence: idData.confidence };
+        }
+        if(idData.name || idData.isCustom) showIdentifySuggestion(idData); // let the user see + confirm the fields too
+      }
+      if(!identifyInfo){
+        // truly nothing to go on — no barcode match AND no usable photo yet.
+        // Not a dead end: tell the user the one concrete thing that unblocks it.
+        return {
+          slots: null,
+          needsPhoto: true,
+          stats: null,
+          productTitle: null,
+          productImage: null,
+          fromCache: false,
+          query
+        };
+      }
+    }
+  }
 
   const cached = await getCachedPricing(query);
-  if(cached) return { ...cached, fromCache:true, query };
+  if(cached) return { ...cached, fromCache:true, query, identifyInfo };
 
   // run every real data source in parallel — one slow/unavailable source
-  // never blocks the others (requirement: graceful degradation)
+  // never blocks the others (requirement: graceful degradation).
+  // If we already resolved the retailer lookup above (to get a real title),
+  // reuse it instead of calling it again.
   const [ebayRes, shopRes, otherRes] = await Promise.allSettled([
     ebayProvider(query),
     shopProvider(query),
-    otherRetailersProvider(profile.barcode)
+    resolvedFromLookup ? Promise.resolve(resolvedFromLookup) : otherRetailersProvider(profile.barcode)
   ]);
 
   const ebay = ebayRes.status === "fulfilled" ? ebayRes.value : { available:false, results:[] };
@@ -1105,7 +1162,8 @@ async function runPricingEngine(profile){
     slots: [slot1, slot2, ...slots345],
     stats,
     productTitle: other.product ? other.product.title : null,
-    productImage: (other.product && other.product.images && other.product.images[0]) || null
+    productImage: (other.product && other.product.images && other.product.images[0]) || null,
+    identifyInfo
   };
 
   await setCachedPricing(query, payload);
@@ -1176,9 +1234,20 @@ async function checkPrices(){
   if(!profile.barcode){ toast("Scan or enter a barcode first", true); return; }
 
   panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="spinner-text">Checking eBay + other sources…</div>`;
+  panel.innerHTML = `<div class="spinner-text">Identifying the car and checking sources…</div>`;
 
   const result = await runPricingEngine(profile);
+
+  if(result.needsPhoto){
+    panel.innerHTML = `
+      <div class="price-note identify-first">
+        This barcode only identifies the assortment, and there's no photo yet to identify
+        the specific car from. <strong>Take a front or back photo</strong> above, then tap
+        Compare Prices again — it'll identify it automatically and search from there.
+      </div>`;
+    draftPrice = null;
+    return;
+  }
 
   // auto-fill the name field if empty and the retailer lookup found a title
   const nameField = document.getElementById("fName");
@@ -1186,6 +1255,12 @@ async function checkPrices(){
     nameField.value = result.productTitle;
     maybeAutoLabel();
   }
+
+  const identifyNoteHtml = result.identifyInfo ? (
+    result.identifyInfo.isCustom
+      ? `<div class="price-note identify-first">Identified as a <strong>custom/unofficial car</strong> from your photos — prices below are estimates based on visually similar customs, not an exact catalog match.</div>`
+      : `<div class="price-note identify-first">Identified from your photos${result.identifyInfo.confidence==="low" ? " (low confidence — double check)" : ""}: <strong>${escapeHtml(result.identifyInfo.name)}</strong></div>`
+  ) : "";
 
   const [slot1, slot2, ...rest] = result.slots;
   draftPrice = (slot1 && slot1.totalCost!=null)
@@ -1204,6 +1279,7 @@ async function checkPrices(){
     </div>` : "";
 
   panel.innerHTML = `
+    ${identifyNoteHtml}
     ${result.productTitle ? `<div class="price-head">${imgHtml}<div class="ptitle">${escapeHtml(result.productTitle)}</div></div>` : ""}
     <div class="resale-block">
       ${offerRowHtml(slot1)}
@@ -1424,21 +1500,11 @@ bindPhotoInput("fileBack", "slotBack", true);
 /* ---------- photo-based identification (Gemini vision, via the Worker) ---------- */
 window.__identifyResult = null;
 
-document.getElementById("btnIdentify").addEventListener("click", async ()=>{
-  const note = document.getElementById("identifyNote");
-  const suggest = document.getElementById("identifySuggest");
-  suggest.classList.add("hidden");
-
-  if(!EBAY_WORKER_URL){
-    toast("Set EBAY_WORKER_URL first — see worker/README.md", true);
-    return;
-  }
-  if(!draftPhotos.front && !draftPhotos.back){
-    toast("Take a front or back photo first", true);
-    return;
-  }
-
-  note.classList.remove("hidden");
+// Reusable: calls the /identify endpoint and returns the parsed result
+// (or null on failure/not-configured), independent of any UI updates.
+async function runIdentify(silent){
+  if(!EBAY_WORKER_URL) return null;
+  if(!draftPhotos.front && !draftPhotos.back) return null;
   try{
     const stripPrefix = (dataUrl) => dataUrl ? dataUrl.replace(/^data:image\/\w+;base64,/, "") : null;
     const url = EBAY_WORKER_URL.replace(/\/$/,"") + "/identify";
@@ -1453,25 +1519,48 @@ document.getElementById("btnIdentify").addEventListener("click", async ()=>{
     });
     const data = await res.json();
     if(!res.ok || data.error){
-      toast("Identify failed: " + (data.error || res.status), true);
-      return;
+      if(!silent) toast("Identify failed: " + (data.error || res.status), true);
+      return null;
     }
+    return data;
+  }catch(err){
+    if(!silent) toast("Identify failed — check your connection", true);
+    return null;
+  }
+}
 
-    window.__identifyResult = data;
-    const bits = [];
+function showIdentifySuggestion(data){
+  window.__identifyResult = data;
+  const suggest = document.getElementById("identifySuggest");
+  const bits = [];
+  if(data.isCustom){
+    bits.push("Custom — " + (data.searchDescription || "unrecognized casting"));
+  }else{
     if(data.name) bits.push(data.name);
     if(data.series) bits.push(data.series);
     if(data.collectorNumber) bits.push("#"+data.collectorNumber);
     if(data.treasureHunt) bits.push("Treasure Hunt");
-    const label = bits.length ? bits.join(" · ") : "Nothing confidently identified";
-    const confNote = data.confidence === "low" ? " (low confidence — double check)" : "";
-    document.getElementById("identifySuggestText").textContent = label + confNote;
-    if(bits.length) suggest.classList.remove("hidden");
-    else toast("Couldn't confidently identify this car — try clearer photos or enter manually", true);
-  }catch(err){
-    toast("Identify failed — check your connection", true);
-  }finally{
-    note.classList.add("hidden");
+  }
+  const label = bits.length ? bits.join(" · ") : "Nothing confidently identified";
+  const confNote = data.confidence === "low" ? " (low confidence — double check)" : "";
+  document.getElementById("identifySuggestText").textContent = label + confNote;
+  if(bits.length){ suggest.classList.remove("hidden"); return true; }
+  return false;
+}
+
+document.getElementById("btnIdentify").addEventListener("click", async ()=>{
+  const note = document.getElementById("identifyNote");
+  document.getElementById("identifySuggest").classList.add("hidden");
+
+  if(!EBAY_WORKER_URL){ toast("Set EBAY_WORKER_URL first — see worker/README.md", true); return; }
+  if(!draftPhotos.front && !draftPhotos.back){ toast("Take a front or back photo first", true); return; }
+
+  note.classList.remove("hidden");
+  const data = await runIdentify(false);
+  note.classList.add("hidden");
+  if(!data) return;
+  if(!showIdentifySuggestion(data)){
+    toast("Couldn't confidently identify this car — try clearer photos or enter manually", true);
   }
 });
 
@@ -1479,7 +1568,7 @@ document.getElementById("btnUseIdentify").addEventListener("click", ()=>{
   const d = window.__identifyResult;
   if(!d) return;
   const setIfEmpty = (id,val)=>{ const el=document.getElementById(id); if(val && !el.value) el.value = val; };
-  setIfEmpty("fName", d.name);
+  setIfEmpty("fName", d.isCustom ? ("Custom — " + (d.searchDescription||"")) : d.name);
   setIfEmpty("fSeries", d.series);
   setIfEmpty("fYear", d.year);
   setIfEmpty("fCollectorNum", d.collectorNumber);

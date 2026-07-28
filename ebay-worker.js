@@ -280,13 +280,21 @@ async function handleIdentify(request, env, headers) {
   }
 
   const promptText =
-    "You are identifying a Hot Wheels die-cast car from its blister-card packaging photo(s). " +
-    (barcode ? `The barcode is ${barcode} (this usually identifies the assortment/series, not the exact casting). ` : "") +
-    "Look at the card art, the printed collector number, series name, and any Treasure Hunt marking. " +
+    "You are identifying a die-cast car from photo(s) — it's either an official packaged " +
+    "Hot Wheels/Matchbox-style card, or a loose/customized car with no packaging. " +
+    (barcode ? `The barcode (if relevant) is ${barcode} — this usually identifies the assortment/series, not the exact casting. ` : "") +
+    "If it's on official packaging: read the card art, printed collector number, series name, " +
+    "and any Treasure Hunt marking. " +
+    "If it looks like a custom, kitbashed, or repainted car with no matching official packaging: " +
+    "set isCustom to true, leave name/series/collectorNumber empty, and instead write a short plain-English " +
+    "visual description in searchDescription — body style, color, finish, wheels, any visible decals — " +
+    "specific enough to search a marketplace for visually similar customs (e.g. " +
+    '"custom black resin muscle car with red flame decals and gold 5-spoke wheels"). ' +
     "Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape: " +
-    '{"name":"","series":"","collectorNumber":"","year":"","variant":"","treasureHunt":false,"tier":"","confidence":"high|low"}. ' +
-    'Use "" for any field you cannot read confidently. Set confidence to "low" if the packaging is unclear, ' +
-    "partially obscured, or you are guessing rather than reading printed text.";
+    '{"name":"","series":"","collectorNumber":"","year":"","variant":"","treasureHunt":false,"tier":"",' +
+    '"isCustom":false,"searchDescription":"","confidence":"high|low"}. ' +
+    'Use "" / false for any field that does not apply. Set confidence to "low" if the photo is unclear, ' +
+    "partially obscured, or you are guessing rather than reading printed text or clear visual details.";
 
   const parts = [{ text: promptText }];
   if (front) parts.push({ inline_data: { mime_type: "image/jpeg", data: front } });
