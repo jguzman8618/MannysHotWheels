@@ -325,6 +325,7 @@
       <div class="scan-controls">
         <button class="btn btn-flame btn-block" id="btnStartScan">Start Scanning</button>
         <button class="btn btn-stop btn-block" id="btnStopScan" style="display:none;">Stop</button>
+        <button class="btn btn-flame btn-block" id="btnScanNext" style="display:none;">Scan Next Item</button>
       </div>
     </div>
 
@@ -540,6 +541,7 @@ async function saveItem(){
   document.getElementById("pricePanel").innerHTML="";
   document.getElementById("dupeBanner").classList.add("hidden");
   draftPrice = null;
+  if(scanning) resumeScan();
 }
 document.getElementById("btnSaveItem").addEventListener("click", saveItem);
 
@@ -684,6 +686,7 @@ function searchLinks(query){
   return [
     {label:"eBay — sold listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`},
     {label:"eBay — active listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}`},
+    {label:"Amazon", url:`https://www.amazon.com/s?k=${q}`},
     {label:"Mercari", url:`https://www.mercari.com/search/?keyword=${q}`},
     {label:"Google Shopping", url:`https://www.google.com/search?tbm=shop&q=${q}`}
   ];
@@ -714,19 +717,25 @@ function checkDuplicate(){
 }
 
 async function fetchJsonWithFallback(targetUrl){
-  // 1) try a direct call first
-  try{
-    const res = await fetch(targetUrl);
-    if(res.ok) return await res.json();
-  }catch(err){ /* likely CORS or offline — fall through to proxy */ }
+  const attempts = [
+    // 1) direct call — works if the API happens to allow the origin
+    () => fetch(targetUrl),
+    // 2 - 4) relay through different public CORS proxies — try several since
+    // free proxy services are individually unreliable/rate-limited
+    () => fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl)),
+    () => fetch("https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(targetUrl)),
+    () => fetch("https://corsproxy.io/?url=" + encodeURIComponent(targetUrl))
+  ];
 
-  // 2) retry through a public CORS-relay proxy (adds Access-Control-Allow-Origin)
-  try{
-    const proxied = "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl);
-    const res2 = await fetch(proxied);
-    if(res2.ok) return await res2.json();
-  }catch(err){ /* still failed */ }
-
+  for(const attempt of attempts){
+    try{
+      const res = await attempt();
+      if(res && res.ok){
+        const json = await res.json();
+        if(json) return json;
+      }
+    }catch(err){ /* try the next one */ }
+  }
   return null;
 }
 
@@ -810,9 +819,11 @@ async function checkPrices(){
       </div>` : ""}
     ${offersHtml}
     <div class="price-note">
-      These prices reflect general retail/marketplace listings for this product, not
-      collector resale value — for rare castings, Treasure Hunts, or errors, check sold
-      eBay listings below for real market value.
+      These prices come from general retail listings this UPC has been matched against —
+      eBay and Amazon rarely show up here since both actively block price-scraping
+      services, so they're almost never part of this automatic list. Use the eBay/Amazon
+      buttons below to check those directly, especially for rare castings, Treasure
+      Hunts, or errors, where real collector value only shows up in sold listings.
     </div>
     ${quicklinksHtml(query)}
   `;
@@ -821,38 +832,56 @@ async function checkPrices(){
 /* ---------- scanner ---------- */
 document.getElementById("btnStartScan").addEventListener("click", startScan);
 document.getElementById("btnStopScan").addEventListener("click", stopScan);
+document.getElementById("btnScanNext").addEventListener("click", resumeScan);
 
 async function startScan(){
   if(scanning) return;
-  scanner = new Html5Qrcode("reader", {
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8
-    ],
-    verbose:false
-  });
   try{
+    scanner = new Html5Qrcode("reader", {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8
+      ],
+      verbose:false
+    });
     await scanner.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 150 } },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
       (decodedText)=>{
         document.getElementById("fBarcode").value = decodedText;
         toast("Scanned: "+decodedText);
         if(navigator.vibrate) navigator.vibrate(80);
         checkDuplicate();
         checkPrices();
+        freezeScan();
       },
       ()=>{ /* ignore per-frame scan failures */ }
     );
     scanning = true;
     document.getElementById("btnStartScan").style.display="none";
     document.getElementById("btnStopScan").style.display="block";
+    document.getElementById("btnScanNext").style.display="none";
   }catch(err){
     toast("Camera unavailable: "+err, true);
   }
 }
+
+function freezeScan(){
+  if(!scanner || !scanning) return;
+  try{ scanner.pause(true); }catch(err){ /* pause not supported — keep scanning live */ }
+  document.getElementById("btnStopScan").style.display="none";
+  document.getElementById("btnScanNext").style.display="block";
+}
+
+function resumeScan(){
+  if(!scanner) return;
+  try{ scanner.resume(); }catch(err){ /* ignore */ }
+  document.getElementById("btnScanNext").style.display="none";
+  document.getElementById("btnStopScan").style.display="block";
+}
+
 async function stopScan(){
   if(scanner && scanning){
     await scanner.stop();
@@ -861,6 +890,7 @@ async function stopScan(){
   }
   document.getElementById("btnStartScan").style.display="block";
   document.getElementById("btnStopScan").style.display="none";
+  document.getElementById("btnScanNext").style.display="none";
 }
 
 /* ---------- init ---------- */
