@@ -219,6 +219,7 @@
     border-bottom:1px solid var(--line);
   }
   .item-row:last-child{border-bottom:none;}
+  .row-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;background:#fff;flex-shrink:0;}
   .item-main .name{font-weight:600;font-size:15px;}
   .item-main .meta{color:var(--muted);font-size:12px;margin-top:2px;}
   .item-actions{display:flex;gap:6px;flex-shrink:0;}
@@ -260,15 +261,45 @@
   .price-head{display:flex;gap:12px;align-items:center;margin-bottom:12px;}
   .price-head img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:8px;flex-shrink:0;}
   .price-head .ptitle{font-size:13px;font-weight:600;line-height:1.3;}
-  .lowest-callout{
-    background:linear-gradient(135deg, rgba(61,220,132,0.15), rgba(61,220,132,0.04));
-    border:1px solid rgba(61,220,132,0.4);
+
+  .resale-block{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .resale-link{
+    display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(135deg, rgba(255,91,31,0.16), rgba(255,91,31,0.05));
+    border:1px solid rgba(255,91,31,0.45);
     border-radius:10px;
-    padding:12px;
-    margin-bottom:12px;
+    padding:13px 14px;
+    text-decoration:none;
+    color:var(--chrome);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    text-transform:uppercase;
+    letter-spacing:0.02em;
   }
-  .lowest-callout .amt{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;color:var(--go);}
-  .lowest-callout .src{font-size:12px;color:var(--muted);margin-top:2px;}
+  .resale-link .sub{
+    display:block;
+    font-family:'Inter',sans-serif;
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .resale-link .go-arrow{color:var(--flame);font-size:18px;}
+
+  .other-offers{margin-top:4px;}
+  .other-offers summary{
+    cursor:pointer;
+    font-size:12px;
+    color:var(--muted);
+    padding:6px 0;
+    list-style:none;
+  }
+  .other-offers summary::-webkit-details-marker{display:none;}
+  .other-offers summary::before{content:"▸ ";}
+  .other-offers[open] summary::before{content:"▾ ";}
   .offer-row{
     display:flex;justify-content:space-between;align-items:center;
     padding:9px 0;border-bottom:1px solid var(--line);
@@ -278,7 +309,6 @@
   .offer-row .merchant{font-weight:600;}
   .offer-row .cond{color:var(--muted);font-size:11px;margin-left:6px;}
   .offer-row .price{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--track-yellow);}
-  .offer-row.best .price{color:var(--go);}
   .quicklinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
   .quicklinks a{
     background:var(--panel-2);border:1px solid var(--line);color:var(--chrome);
@@ -304,6 +334,54 @@
   }
   .dupe-banner b{color:var(--chrome);}
   .dupe-banner.hidden{display:none;}
+
+  /* photo capture */
+  .photo-row{display:flex;gap:10px;margin:14px 0;}
+  .photo-slot{
+    flex:1;
+    aspect-ratio:1/1;
+    border-radius:10px;
+    border:2px dashed var(--line);
+    background:var(--panel-2);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    cursor:pointer;
+    overflow:hidden;
+    position:relative;
+    color:var(--muted);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    font-size:12px;
+    letter-spacing:0.03em;
+  }
+  .photo-slot.filled{border-style:solid;border-color:var(--flame-dim);}
+  .photo-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .photo-slot .plus{font-size:22px;line-height:1;}
+  .photo-slot .retake{
+    position:absolute;bottom:6px;right:6px;
+    background:rgba(11,13,16,0.75);
+    color:var(--chrome);
+    font-size:10px;font-weight:700;
+    padding:3px 7px;border-radius:6px;
+    text-transform:uppercase;
+  }
+  .ocr-note{font-size:12px;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+  .ocr-note.hidden{display:none;}
+  .ocr-suggest{
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;padding:9px 11px;margin-bottom:12px;
+    font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .ocr-suggest.hidden{display:none;}
+  .ocr-suggest button{
+    background:var(--flame);color:#1a0c05;border:none;border-radius:6px;
+    font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;
+    text-transform:uppercase;font-family:'Rajdhani',sans-serif;flex-shrink:0;
+  }
 </style>
 </head>
 <body>
@@ -339,6 +417,22 @@
       <button class="btn btn-ghost btn-block" id="btnCheckPrice" type="button">Compare Prices</button>
 
       <div class="price-panel hidden" id="pricePanel"></div>
+
+      <div class="photo-row">
+        <label class="photo-slot" id="slotFront">
+          <span class="plus">＋</span><span>Front photo</span>
+          <input type="file" accept="image/*" capture="environment" id="fileFront" style="display:none;">
+        </label>
+        <label class="photo-slot" id="slotBack">
+          <span class="plus">＋</span><span>Back photo</span>
+          <input type="file" accept="image/*" capture="environment" id="fileBack" style="display:none;">
+        </label>
+      </div>
+      <div class="ocr-note hidden" id="ocrNote">Reading text from photo…</div>
+      <div class="ocr-suggest hidden" id="ocrSuggest">
+        <span id="ocrSuggestText"></span>
+        <button id="btnUseOcr" type="button">Use this</button>
+      </div>
 
       <label class="field" style="margin-top:16px;">
         <span>Car name / series (optional)</span>
@@ -404,6 +498,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 /* ---------- storage: tiny IndexedDB wrapper ---------- */
 const DB_NAME = "mannys_hw_db";
@@ -530,6 +625,8 @@ async function saveItem(){
     item.lowestMerchant = draftPrice.lowestMerchant;
     item.priceCheckedAt = draftPrice.checkedAt;
   }
+  if(draftPhotos.front) item.photoFront = draftPhotos.front;
+  if(draftPhotos.back) item.photoBack = draftPhotos.back;
   await put("items", item);
   await loadItems();
   renderRecent();
@@ -541,6 +638,7 @@ async function saveItem(){
   document.getElementById("pricePanel").innerHTML="";
   document.getElementById("dupeBanner").classList.add("hidden");
   draftPrice = null;
+  resetPhotoSlots();
   if(scanning) resumeScan();
 }
 document.getElementById("btnSaveItem").addEventListener("click", saveItem);
@@ -566,7 +664,11 @@ function itemRowHtml(it){
   const priceBit = (it.lowestPrice!=null)
     ? `<span class="price-badge">$${Number(it.lowestPrice).toFixed(2)}${it.lowestMerchant?(" · "+escapeHtml(it.lowestMerchant)):""}</span>`
     : "";
+  const thumb = it.photoFront
+    ? `<img src="${it.photoFront}" alt="" class="row-thumb" />`
+    : "";
   return `<div class="item-row" data-id="${escapeHtml(it.id)}">
+    ${thumb}
     <div class="item-main">
       <div class="name">${escapeHtml(it.name || it.barcode)}</div>
       <div class="meta">${escapeHtml(it.barcode)} · <span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label)):""}${priceBit}</div>
@@ -681,19 +783,31 @@ document.getElementById("importFile").addEventListener("change", async (e)=>{
 /* ---------- price comparison ---------- */
 let draftPrice = null;
 
-function searchLinks(query){
+function resaleLinks(query){
   const q = encodeURIComponent(query);
   return [
-    {label:"eBay — sold listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`},
-    {label:"eBay — active listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}`},
-    {label:"Amazon", url:`https://www.amazon.com/s?k=${q}`},
+    {label:"eBay — sold listings", sub:"real resale value", url:`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`},
+    {label:"eBay — active listings", sub:"what it's listed for now", url:`https://www.ebay.com/sch/i.html?_nkw=${q}`},
+    {label:"Amazon", sub:"", url:`https://www.amazon.com/s?k=${q}`}
+  ];
+}
+function otherLinks(query){
+  const q = encodeURIComponent(query);
+  return [
     {label:"Mercari", url:`https://www.mercari.com/search/?keyword=${q}`},
     {label:"Google Shopping", url:`https://www.google.com/search?tbm=shop&q=${q}`}
   ];
 }
 
-function quicklinksHtml(query){
-  return `<div class="quicklinks">${searchLinks(query).map(l=>`<a href="${l.url}" target="_blank" rel="noopener">${l.label} ↗</a>`).join("")}</div>`;
+function resaleLinksHtml(query){
+  return resaleLinks(query).map(l=>`
+    <a class="resale-link" href="${l.url}" target="_blank" rel="noopener">
+      <span>${l.label}${l.sub?(`<span class="sub">${l.sub}</span>`):""}</span>
+      <span class="go-arrow">↗</span>
+    </a>`).join("");
+}
+function otherLinksHtml(query){
+  return `<div class="quicklinks">${otherLinks(query).map(l=>`<a href="${l.url}" target="_blank" rel="noopener">${l.label} ↗</a>`).join("")}</div>`;
 }
 
 document.getElementById("btnCheckPrice").addEventListener("click", checkPrices);
@@ -716,27 +830,28 @@ function checkDuplicate(){
   banner.classList.remove("hidden");
 }
 
-async function fetchJsonWithFallback(targetUrl){
-  const attempts = [
-    // 1) direct call — works if the API happens to allow the origin
-    () => fetch(targetUrl),
-    // 2 - 4) relay through different public CORS proxies — try several since
-    // free proxy services are individually unreliable/rate-limited
-    () => fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl)),
-    () => fetch("https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(targetUrl)),
-    () => fetch("https://corsproxy.io/?url=" + encodeURIComponent(targetUrl))
-  ];
+function fetchWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), ms);
+  return fetch(url, {signal: controller.signal})
+    .then(res => { clearTimeout(timer); if(!res.ok) throw new Error("bad status"); return res.json(); })
+    .catch(err => { clearTimeout(timer); throw err; });
+}
 
-  for(const attempt of attempts){
-    try{
-      const res = await attempt();
-      if(res && res.ok){
-        const json = await res.json();
-        if(json) return json;
-      }
-    }catch(err){ /* try the next one */ }
+async function fetchJsonWithFallback(targetUrl){
+  // fire the direct call + every proxy in parallel, each capped at 6s,
+  // and use whichever comes back first — much faster than trying one at a time
+  const urls = [
+    targetUrl,
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl),
+    "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(targetUrl),
+    "https://corsproxy.io/?url=" + encodeURIComponent(targetUrl)
+  ];
+  try{
+    return await Promise.any(urls.map(u => fetchWithTimeout(u, 6000)));
+  }catch(err){
+    return null; // every attempt failed or timed out
   }
-  return null;
 }
 
 async function checkPrices(){
@@ -745,89 +860,165 @@ async function checkPrices(){
   if(!barcode){ toast("Scan or enter a barcode first", true); return; }
 
   panel.classList.remove("hidden");
-  panel.innerHTML = `<div class="spinner-text">Checking sources for ${escapeHtml(barcode)}…</div>`;
+  panel.innerHTML = `<div class="spinner-text">Looking this up…</div>`;
 
   const data = await fetchJsonWithFallback(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
-  const fetchFailed = data === null;
-
   const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
   const query = product && product.title ? product.title : ("Hot Wheels " + barcode);
 
-  if(!product){
-    draftPrice = null;
-    panel.innerHTML = `
-      <div class="price-note">
-        ${fetchFailed ? "Couldn't reach the product database (offline or blocked)." : "No listing found in the barcode database for this UPC."}
-        Try these sources directly instead — this is also the best way to check real collector value,
-        since resale price for rarer castings isn't in general product databases:
-      </div>
-      ${quicklinksHtml(query)}
-    `;
-    return;
-  }
-
-  // gather offers from multiple sources returned by the lookup
-  let offers = (product.offers || [])
-    .filter(o => o.price && Number(o.price) > 0)
-    .map(o => ({
-      merchant: o.merchant || "Unknown seller",
-      price: Number(o.price),
-      condition: o.condition || "",
-      link: o.link || null
-    }))
-    .sort((a,b)=>a.price - b.price);
-
-  const lowest = offers.length ? offers[0] : (product.lowest_recorded_price ? {merchant:"recorded low", price:Number(product.lowest_recorded_price)} : null);
-
-  if(lowest){
-    draftPrice = {
-      barcode,
-      lowest: lowest.price,
-      lowestMerchant: lowest.merchant,
-      checkedAt: Date.now()
-    };
-  } else {
-    draftPrice = null;
-  }
-
-  // auto-fill the name field if empty
+  // auto-fill the name field if empty and we got a title
   const nameField = document.getElementById("fName");
-  if(!nameField.value.trim() && product.title){
+  if(!nameField.value.trim() && product && product.title){
     nameField.value = product.title;
   }
 
-  const imgHtml = product.images && product.images[0]
+  // gather secondary offers (Walmart/Target/etc.) — kept, but demoted below eBay/Amazon
+  let offers = [];
+  if(product){
+    offers = (product.offers || [])
+      .filter(o => o.price && Number(o.price) > 0)
+      .map(o => ({
+        merchant: o.merchant || "Unknown seller",
+        price: Number(o.price),
+        condition: o.condition || "",
+        link: o.link || null
+      }))
+      .sort((a,b)=>a.price - b.price);
+  }
+  const lowest = offers.length ? offers[0] : null;
+  draftPrice = lowest ? {barcode, lowest: lowest.price, lowestMerchant: lowest.merchant, checkedAt: Date.now()} : null;
+
+  const imgHtml = product && product.images && product.images[0]
     ? `<img src="${product.images[0]}" alt="" />` : "";
 
-  const offersHtml = offers.length
-    ? offers.map((o,i)=>`
-        <a class="offer-row${i===0?" best":""}" href="${o.link||"#"}" target="_blank" rel="noopener">
-          <span><span class="merchant">${escapeHtml(o.merchant)}</span>${o.condition?(`<span class="cond">${escapeHtml(o.condition)}</span>`):""}</span>
-          <span class="price">$${o.price.toFixed(2)}</span>
-        </a>`).join("")
-    : `<div class="price-note">No live seller offers returned for this UPC — only historical price range below.</div>`;
+  const otherOffersHtml = offers.length
+    ? `<details class="other-offers">
+         <summary>Other listings found (${offers.length}) — not eBay/Amazon</summary>
+         ${offers.map((o,i)=>`
+           <a class="offer-row" href="${o.link||"#"}" target="_blank" rel="noopener">
+             <span><span class="merchant">${escapeHtml(o.merchant)}</span>${o.condition?(`<span class="cond">${escapeHtml(o.condition)}</span>`):""}</span>
+             <span class="price">$${o.price.toFixed(2)}</span>
+           </a>`).join("")}
+       </details>`
+    : "";
 
   panel.innerHTML = `
-    <div class="price-head">
-      ${imgHtml}
-      <div class="ptitle">${escapeHtml(product.title || query)}</div>
+    ${product ? `
+      <div class="price-head">
+        ${imgHtml}
+        <div class="ptitle">${escapeHtml(product.title || query)}</div>
+      </div>` : `<div class="price-note">Not found in the general product database — search below directly.</div>`}
+    <div class="resale-block">
+      ${resaleLinksHtml(query)}
     </div>
-    ${lowest ? `
-      <div class="lowest-callout">
-        <div class="amt">$${lowest.price.toFixed(2)}</div>
-        <div class="src">Lowest found · ${escapeHtml(lowest.merchant)}</div>
-      </div>` : ""}
-    ${offersHtml}
-    <div class="price-note">
-      These prices come from general retail listings this UPC has been matched against —
-      eBay and Amazon rarely show up here since both actively block price-scraping
-      services, so they're almost never part of this automatic list. Use the eBay/Amazon
-      buttons below to check those directly, especially for rare castings, Treasure
-      Hunts, or errors, where real collector value only shows up in sold listings.
-    </div>
-    ${quicklinksHtml(query)}
+    ${otherOffersHtml}
+    ${otherLinksHtml(query)}
   `;
 }
+
+/* ---------- photo capture + OCR name suggestion ---------- */
+let draftPhotos = { front: null, back: null };
+
+function resizeImage(file, maxW){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e)=>{ img.src = e.target.result; };
+    img.onload = ()=>{
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function setPhotoSlot(slotId, dataUrl){
+  const slot = document.getElementById(slotId);
+  slot.classList.add("filled");
+  slot.innerHTML = `<img src="${dataUrl}" alt="" /><span class="retake">Retake</span>`;
+  // re-attach the hidden file input (innerHTML replace wiped it)
+  const inputId = slotId === "slotFront" ? "fileFront" : "fileBack";
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "image/*"; input.capture = "environment";
+  input.id = inputId; input.style.display = "none";
+  slot.appendChild(input);
+  bindPhotoInput(inputId, slotId, true);
+}
+
+function resetPhotoSlots(){
+  draftPhotos = { front: null, back: null };
+  ["slotFront","slotBack"].forEach((slotId, i)=>{
+    const slot = document.getElementById(slotId);
+    slot.classList.remove("filled");
+    const label = i===0 ? "Front photo" : "Back photo";
+    slot.innerHTML = `<span class="plus">＋</span><span>${label}</span>`;
+    const inputId = i===0 ? "fileFront" : "fileBack";
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*"; input.capture = "environment";
+    input.id = inputId; input.style.display = "none";
+    slot.appendChild(input);
+    bindPhotoInput(inputId, slotId, true);
+  });
+  document.getElementById("ocrSuggest").classList.add("hidden");
+  document.getElementById("ocrNote").classList.add("hidden");
+}
+
+function bindPhotoInput(inputId, slotId, runOcr){
+  const input = document.getElementById(inputId);
+  input.addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const dataUrl = await resizeImage(file, 700);
+    draftPhotos[slotId === "slotFront" ? "front" : "back"] = dataUrl;
+    setPhotoSlot(slotId, dataUrl);
+    if(runOcr) runOcrOnBack(dataUrl);
+  });
+  document.getElementById(slotId).addEventListener("click", (e)=>{
+    if(e.target.closest("input")) return; // avoid double-trigger
+    document.getElementById(inputId).click();
+  });
+}
+
+async function runOcrOnBack(dataUrl){
+  const note = document.getElementById("ocrNote");
+  const suggest = document.getElementById("ocrSuggest");
+  suggest.classList.add("hidden");
+  if(typeof Tesseract === "undefined"){
+    return; // library failed to load — skip silently, manual entry still works
+  }
+  note.classList.remove("hidden");
+  try{
+    const result = await Tesseract.recognize(dataUrl, "eng");
+    const raw = (result && result.data && result.data.text) || "";
+    // heuristic: take the longest reasonably-sized line as the likely model name
+    const candidate = raw.split("\n")
+      .map(l=>l.trim())
+      .filter(l=>l.length>=3 && l.length<=40 && /[a-zA-Z]/.test(l))
+      .sort((a,b)=>b.length-a.length)[0];
+    if(candidate){
+      document.getElementById("ocrSuggestText").textContent = `Read from photo: "${candidate}"`;
+      suggest.classList.remove("hidden");
+    }
+  }catch(err){
+    /* OCR failed — no big deal, manual entry still works */
+  }finally{
+    note.classList.add("hidden");
+  }
+}
+
+document.getElementById("btnUseOcr").addEventListener("click", ()=>{
+  const text = document.getElementById("ocrSuggestText").textContent.replace(/^Read from photo: "|"$/g, "");
+  document.getElementById("fName").value = text;
+  document.getElementById("ocrSuggest").classList.add("hidden");
+});
+
+bindPhotoInput("fileFront", "slotFront", true);
+bindPhotoInput("fileBack", "slotBack", true);
 
 /* ---------- scanner ---------- */
 document.getElementById("btnStartScan").addEventListener("click", startScan);
