@@ -293,6 +293,17 @@
     font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
     font-family:'Rajdhani',sans-serif;margin-left:4px;
   }
+  .dupe-banner{
+    background:rgba(244,196,15,0.1);
+    border:1px solid rgba(244,196,15,0.4);
+    border-radius:10px;
+    padding:11px 12px;
+    margin-bottom:12px;
+    font-size:13px;
+    color:var(--track-yellow);
+  }
+  .dupe-banner b{color:var(--chrome);}
+  .dupe-banner.hidden{display:none;}
 </style>
 </head>
 <body>
@@ -319,6 +330,7 @@
 
     <div class="card">
       <div class="section-title">Item details</div>
+      <div class="dupe-banner hidden" id="dupeBanner"></div>
       <label class="field">
         <span>Barcode (UPC)</span>
         <input type="text" id="fBarcode" placeholder="Scan above or type manually" />
@@ -526,6 +538,7 @@ async function saveItem(){
   document.getElementById("fLabel").value="";
   document.getElementById("pricePanel").classList.add("hidden");
   document.getElementById("pricePanel").innerHTML="";
+  document.getElementById("dupeBanner").classList.add("hidden");
   draftPrice = null;
 }
 document.getElementById("btnSaveItem").addEventListener("click", saveItem);
@@ -686,7 +699,36 @@ document.getElementById("fBarcode").addEventListener("input", ()=>{
   const panel = document.getElementById("pricePanel");
   panel.classList.add("hidden");
   panel.innerHTML = "";
+  checkDuplicate();
 });
+
+function checkDuplicate(){
+  const barcode = document.getElementById("fBarcode").value.trim();
+  const banner = document.getElementById("dupeBanner");
+  if(!barcode){ banner.classList.add("hidden"); return; }
+  const matches = items.filter(it=>it.barcode===barcode);
+  if(matches.length===0){ banner.classList.add("hidden"); return; }
+  const totesList = [...new Set(matches.map(m=>m.tote))].join(", ");
+  banner.innerHTML = `⚠️ Already in your collection (${matches.length}) — in <b>${escapeHtml(totesList)}</b>. Search "${escapeHtml(barcode)}" in Collection to see it.`;
+  banner.classList.remove("hidden");
+}
+
+async function fetchJsonWithFallback(targetUrl){
+  // 1) try a direct call first
+  try{
+    const res = await fetch(targetUrl);
+    if(res.ok) return await res.json();
+  }catch(err){ /* likely CORS or offline — fall through to proxy */ }
+
+  // 2) retry through a public CORS-relay proxy (adds Access-Control-Allow-Origin)
+  try{
+    const proxied = "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl);
+    const res2 = await fetch(proxied);
+    if(res2.ok) return await res2.json();
+  }catch(err){ /* still failed */ }
+
+  return null;
+}
 
 async function checkPrices(){
   const barcode = document.getElementById("fBarcode").value.trim();
@@ -696,14 +738,8 @@ async function checkPrices(){
   panel.classList.remove("hidden");
   panel.innerHTML = `<div class="spinner-text">Checking sources for ${escapeHtml(barcode)}…</div>`;
 
-  let data = null;
-  let fetchFailed = false;
-  try{
-    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
-    data = await res.json();
-  }catch(err){
-    fetchFailed = true;
-  }
+  const data = await fetchJsonWithFallback(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+  const fetchFailed = data === null;
 
   const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
   const query = product && product.title ? product.title : ("Hot Wheels " + barcode);
@@ -805,6 +841,8 @@ async function startScan(){
         document.getElementById("fBarcode").value = decodedText;
         toast("Scanned: "+decodedText);
         if(navigator.vibrate) navigator.vibrate(80);
+        checkDuplicate();
+        checkPrices();
       },
       ()=>{ /* ignore per-frame scan failures */ }
     );
