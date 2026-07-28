@@ -425,6 +425,13 @@
           <input type="file" accept="image/*" capture="environment" id="fileBack" style="display:none;">
         </label>
       </div>
+      <button class="btn btn-ghost btn-block" id="btnIdentify" type="button">Identify Car from Photos</button>
+      <div class="ocr-note hidden" id="identifyNote">Looking at the photos…</div>
+      <div class="ocr-suggest hidden" id="identifySuggest">
+        <span id="identifySuggestText"></span>
+        <button id="btnUseIdentify" type="button">Fill these in</button>
+      </div>
+
       <div class="ocr-note hidden" id="ocrNote">Reading text from photo…</div>
       <div class="ocr-suggest hidden" id="ocrSuggest">
         <span id="ocrSuggestText"></span>
@@ -540,7 +547,7 @@
 /* ---------- config ---------- */
 // Fill this in once you deploy the eBay backend Worker — see worker/README.md.
 // Leave blank to run without live eBay pricing (the app degrades gracefully).
-const EBAY_WORKER_URL = "https://black-sound-9d64.jguzman8618.workers.dev"; // e.g. "https://mannys-hotwheels-ebay.you.workers.dev"
+const EBAY_WORKER_URL = ""; // e.g. "https://mannys-hotwheels-ebay.you.workers.dev"
 
 const PRICE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -1262,8 +1269,12 @@ function resetPhotoSlots(){
   document.getElementById("ocrSuggest").classList.add("hidden");
   document.getElementById("ocrFieldSuggest").classList.add("hidden");
   document.getElementById("ocrNote").classList.add("hidden");
+  document.getElementById("identifySuggest").classList.add("hidden");
+  document.getElementById("identifyNote").classList.add("hidden");
   ocrCombinedText = "";
+  ocrCandidates = [];
   window.__ocrFieldGuesses = null;
+  window.__identifyResult = null;
 }
 
 function bindPhotoInput(inputId, slotId, runOcr){
@@ -1274,7 +1285,7 @@ function bindPhotoInput(inputId, slotId, runOcr){
     const dataUrl = await resizeImage(file, 700);
     draftPhotos[slotId === "slotFront" ? "front" : "back"] = dataUrl;
     setPhotoSlot(slotId, dataUrl);
-    if(runOcr) runOcrOnBack(dataUrl);
+    if(runOcr) runOcrOnBack(dataUrl, slotId === "slotFront" ? "front" : "back");
   });
   document.getElementById(slotId).addEventListener("click", (e)=>{
     if(e.target.closest("input")) return; // avoid double-trigger
@@ -1283,8 +1294,44 @@ function bindPhotoInput(inputId, slotId, runOcr){
 }
 
 let ocrCombinedText = ""; // accumulated across front+back, used in the canonical profile
+let ocrCandidates = [];   // {text, side} pairs collected across both photos
 
-async function runOcrOnBack(dataUrl){
+// Packaging boilerplate that should never be suggested as the vehicle name —
+// this is what was causing legal/regulatory sentences to get picked.
+const OCR_BLACKLIST = [
+  /anniversary/i, /subject to availability/i, /colors? and decorations?/i,
+  /trademark/i, /mattel/i, /manufactured/i, /warning/i, /small parts?/i,
+  /not intended/i, /ages? \d/i, /consumer information/i, /conforms? to/i,
+  /astm/i, /proof of purchase/i, /www\.|http|\.com/i, /choking hazard/i,
+  /distributed by/i, /assembled in/i, /made in/i, /batteries/i,
+  /recycl/i, /copyright|©|®|™/i, /\btel\b|\bfax\b|1-8\d{2}-/i,
+  /collect them all/i, /each sold separately/i
+];
+
+function scoreOcrLine(line, side){
+  const wordCount = line.split(/\s+/).filter(Boolean).length;
+  const digitRatio = (line.match(/\d/g) || []).length / line.length;
+  let score = 0;
+
+  if(OCR_BLACKLIST.some(re => re.test(line))) return -100; // hard reject
+
+  if(line.length >= 5 && line.length <= 30) score += 10;
+  else if(line.length > 30) score -= (line.length - 30) * 0.5;
+
+  if(wordCount <= 5) score += 8;
+  else score -= (wordCount - 5) * 4; // sentences get penalized hard
+
+  if(digitRatio > 0.3) score -= 20; // likely barcode/address noise
+
+  if(/^[A-Z0-9 '&\-]+$/.test(line)) score += 12;        // ALL CAPS — common for card titles
+  else if(/^([A-Z][a-z']*\s*)+$/.test(line)) score += 8; // Title Case
+
+  if(side === "front") score += 15; // the actual name is far more often on the front
+
+  return score;
+}
+
+async function runOcrOnBack(dataUrl, side){
   const note = document.getElementById("ocrNote");
   const nameSuggest = document.getElementById("ocrSuggest");
   const fieldSuggest = document.getElementById("ocrFieldSuggest");
@@ -1299,13 +1346,21 @@ async function runOcrOnBack(dataUrl){
     const raw = (result && result.data && result.data.text) || "";
     ocrCombinedText = (ocrCombinedText + "\n" + raw).trim();
 
-    // name candidate: longest reasonably-sized line
-    const candidate = raw.split("\n")
+    // add this photo's qualifying lines to the running candidate pool,
+    // then re-score everything collected so far (from both photos) together
+    raw.split("\n")
       .map(l=>l.trim())
-      .filter(l=>l.length>=3 && l.length<=40 && /[a-zA-Z]/.test(l))
-      .sort((a,b)=>b.length-a.length)[0];
-    if(candidate){
-      document.getElementById("ocrSuggestText").textContent = `Read from photo: "${candidate}"`;
+      .filter(l=>l.length>=3 && l.length<=60 && /[a-zA-Z]/.test(l))
+      .forEach(l => ocrCandidates.push({ text:l, side }));
+
+    const scored = ocrCandidates
+      .map(c => ({ ...c, score: scoreOcrLine(c.text, c.side) }))
+      .sort((a,b)=>b.score - a.score);
+    const best = scored[0];
+
+    // only suggest if it actually looks plausible — silence beats a bad guess
+    if(best && best.score > 5){
+      document.getElementById("ocrSuggestText").textContent = `Read from photo: "${best.text}"`;
       nameSuggest.classList.remove("hidden");
     }
 
@@ -1365,6 +1420,76 @@ document.getElementById("btnUseOcrFields").addEventListener("click", ()=>{
 
 bindPhotoInput("fileFront", "slotFront", true);
 bindPhotoInput("fileBack", "slotBack", true);
+
+/* ---------- photo-based identification (Gemini vision, via the Worker) ---------- */
+window.__identifyResult = null;
+
+document.getElementById("btnIdentify").addEventListener("click", async ()=>{
+  const note = document.getElementById("identifyNote");
+  const suggest = document.getElementById("identifySuggest");
+  suggest.classList.add("hidden");
+
+  if(!EBAY_WORKER_URL){
+    toast("Set EBAY_WORKER_URL first — see worker/README.md", true);
+    return;
+  }
+  if(!draftPhotos.front && !draftPhotos.back){
+    toast("Take a front or back photo first", true);
+    return;
+  }
+
+  note.classList.remove("hidden");
+  try{
+    const stripPrefix = (dataUrl) => dataUrl ? dataUrl.replace(/^data:image\/\w+;base64,/, "") : null;
+    const url = EBAY_WORKER_URL.replace(/\/$/,"") + "/identify";
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        front: stripPrefix(draftPhotos.front),
+        back: stripPrefix(draftPhotos.back),
+        barcode: document.getElementById("fBarcode").value.trim()
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){
+      toast("Identify failed: " + (data.error || res.status), true);
+      return;
+    }
+
+    window.__identifyResult = data;
+    const bits = [];
+    if(data.name) bits.push(data.name);
+    if(data.series) bits.push(data.series);
+    if(data.collectorNumber) bits.push("#"+data.collectorNumber);
+    if(data.treasureHunt) bits.push("Treasure Hunt");
+    const label = bits.length ? bits.join(" · ") : "Nothing confidently identified";
+    const confNote = data.confidence === "low" ? " (low confidence — double check)" : "";
+    document.getElementById("identifySuggestText").textContent = label + confNote;
+    if(bits.length) suggest.classList.remove("hidden");
+    else toast("Couldn't confidently identify this car — try clearer photos or enter manually", true);
+  }catch(err){
+    toast("Identify failed — check your connection", true);
+  }finally{
+    note.classList.add("hidden");
+  }
+});
+
+document.getElementById("btnUseIdentify").addEventListener("click", ()=>{
+  const d = window.__identifyResult;
+  if(!d) return;
+  const setIfEmpty = (id,val)=>{ const el=document.getElementById(id); if(val && !el.value) el.value = val; };
+  setIfEmpty("fName", d.name);
+  setIfEmpty("fSeries", d.series);
+  setIfEmpty("fYear", d.year);
+  setIfEmpty("fCollectorNum", d.collectorNumber);
+  setIfEmpty("fVariant", d.variant);
+  if(d.tier && !document.getElementById("fTier").value) document.getElementById("fTier").value = d.tier;
+  if(d.treasureHunt) document.getElementById("fTreasureHunt").checked = true;
+  document.getElementById("identifySuggest").classList.add("hidden");
+  maybeAutoLabel();
+  toast("Filled in from photo identification");
+});
 
 /* ---------- scanner ---------- */
 document.getElementById("btnStartScan").addEventListener("click", startScan);

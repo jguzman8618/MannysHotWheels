@@ -76,6 +76,10 @@ export default {
       return handleShopSearch(url, env, headers);
     }
 
+    if (url.pathname === "/identify") {
+      return handleIdentify(request, env, headers);
+    }
+
     if (url.pathname !== "/ebay-search") {
       return new Response(JSON.stringify({ error: "not_found" }), {
         status: 404,
@@ -216,6 +220,126 @@ async function handleShopSearch(url, env, headers) {
       .sort((a, b) => a.totalCost - b.totalCost);
 
     return new Response(JSON.stringify({ results }), {
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "worker_error", detail: String(err) }), {
+      status: 500,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+}
+
+/**
+ * /identify — POST { front: "<base64 jpeg, no data: prefix>", back: "<...>",
+ *                     barcode: "..." (optional context) }
+ *
+ * Why this exists: the barcode often only identifies an assortment/series,
+ * not the exact casting — the UPC is frequently shared across an entire
+ * wave of different cars. Reading the actual card art is the only way to
+ * get the specific casting, color, and collector number reliably. This
+ * calls Gemini's vision API (free tier, no card required) to do that.
+ *
+ * Requires secret: GEMINI_API_KEY.
+ * Returns: { name, series, collectorNumber, year, variant, treasureHunt,
+ *            tier, confidence: "high"|"low" }
+ * confidence is a plain read of the model's own self-reported certainty,
+ * never fabricated — "low" means the model itself wasn't sure, and the
+ * app treats that as a suggestion to confirm, not an auto-fill.
+ */
+async function handleIdentify(request, env, headers) {
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+  if (!env.GEMINI_API_KEY) {
+    return new Response(JSON.stringify({ error: "not_configured", detail: "GEMINI_API_KEY secret not set" }), {
+      status: 501,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "bad_request", detail: "invalid JSON body" }), {
+      status: 400,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+
+  const { front, back, barcode } = body || {};
+  if (!front && !back) {
+    return new Response(JSON.stringify({ error: "missing_images" }), {
+      status: 400,
+      headers: { ...headers, "Content-Type": "application/json" }
+    });
+  }
+
+  const promptText =
+    "You are identifying a Hot Wheels die-cast car from its blister-card packaging photo(s). " +
+    (barcode ? `The barcode is ${barcode} (this usually identifies the assortment/series, not the exact casting). ` : "") +
+    "Look at the card art, the printed collector number, series name, and any Treasure Hunt marking. " +
+    "Respond with ONLY a JSON object, no markdown, no explanation, in exactly this shape: " +
+    '{"name":"","series":"","collectorNumber":"","year":"","variant":"","treasureHunt":false,"tier":"","confidence":"high|low"}. ' +
+    'Use "" for any field you cannot read confidently. Set confidence to "low" if the packaging is unclear, ' +
+    "partially obscured, or you are guessing rather than reading printed text.";
+
+  const parts = [{ text: promptText }];
+  if (front) parts.push({ inline_data: { mime_type: "image/jpeg", data: front } });
+  if (back) parts.push({ inline_data: { mime_type: "image/jpeg", data: back } });
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { temperature: 0, responseMimeType: "application/json" }
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const detail = await res.text();
+      return new Response(JSON.stringify({ error: "gemini_api_error", status: res.status, detail }), {
+        status: 502,
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
+    }
+
+    const data = await res.json();
+    const text =
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content &&
+      data.candidates[0].content.parts &&
+      data.candidates[0].content.parts[0] &&
+      data.candidates[0].content.parts[0].text;
+
+    if (!text) {
+      return new Response(JSON.stringify({ error: "empty_response" }), {
+        status: 502,
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "unparseable_response", raw: text }), {
+        status: 502,
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
+    }
+
+    return new Response(JSON.stringify(parsed), {
       headers: { ...headers, "Content-Type": "application/json" }
     });
   } catch (err) {
