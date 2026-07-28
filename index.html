@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Manny's Hot Wheels</title>
+<meta name="theme-color" content="#ff5b1f" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt:#0b0d10;
+    --panel:#15181d;
+    --panel-2:#1c2027;
+    --line:#272c34;
+    --flame:#ff5b1f;
+    --flame-dim:#c94517;
+    --track-yellow:#f4c40f;
+    --chrome:#f5f0e6;
+    --muted:#9aa0a6;
+    --go:#3ddc84;
+    --stop:#e5484d;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--asphalt);
+    color:var(--chrome);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    padding-bottom:84px;
+  }
+  h1,h2,h3,.display{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+    margin:0;
+  }
+
+  /* header */
+  header{
+    padding:22px 18px 16px;
+    background:
+      linear-gradient(180deg, rgba(255,91,31,0.14), transparent 70%),
+      var(--asphalt);
+    border-bottom:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  .checker{
+    display:flex;
+    width:64px;height:10px;
+    margin-top:10px;
+    border-radius:2px;
+    overflow:hidden;
+  }
+  .checker span{flex:1;height:100%;}
+  .checker span:nth-child(odd){background:var(--chrome);}
+  .checker span:nth-child(even){background:var(--asphalt);border:1px solid var(--line);}
+  header h1{font-size:28px;color:var(--chrome);}
+  header h1 em{font-style:normal;color:var(--flame);}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px;}
+
+  /* tabs */
+  nav.tabs{
+    display:flex;
+    gap:0;
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--panel);
+    border-top:1px solid var(--line);
+    z-index:20;
+  }
+  nav.tabs button{
+    flex:1;
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    font-size:13px;
+    padding:14px 4px 10px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    cursor:pointer;
+  }
+  nav.tabs button .dot{width:5px;height:5px;border-radius:50%;background:transparent;}
+  nav.tabs button.active{color:var(--flame);}
+  nav.tabs button.active .dot{background:var(--flame);}
+
+  main{padding:16px;max-width:640px;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:14px;
+  }
+
+  /* scanner */
+  .scan-frame{
+    position:relative;
+    border-radius:var(--radius);
+    overflow:hidden;
+    border:2px solid var(--flame-dim);
+    background:#000;
+    aspect-ratio:1/1;
+  }
+  #reader{width:100%;height:100%;}
+  .scan-frame::before, .scan-frame::after{
+    content:"";
+    position:absolute;
+    width:26px;height:26px;
+    border-color:var(--flame);
+    border-style:solid;
+    z-index:5;
+    pointer-events:none;
+  }
+  .scan-frame::before{top:10px;left:10px;border-width:3px 0 0 3px;}
+  .scan-frame::after{bottom:10px;right:10px;border-width:0 3px 3px 0;}
+  .scan-controls{display:flex;gap:8px;margin-top:12px;}
+
+  button.btn{
+    font-family:'Rajdhani',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    font-size:14px;
+    border:none;
+    border-radius:10px;
+    padding:12px 16px;
+    cursor:pointer;
+  }
+  .btn-flame{background:var(--flame);color:#1a0c05;}
+  .btn-flame:active{background:var(--flame-dim);}
+  .btn-ghost{background:var(--panel-2);color:var(--chrome);border:1px solid var(--line);}
+  .btn-stop{background:var(--stop);color:#2a0505;}
+  .btn-sm{padding:8px 12px;font-size:12px;}
+  .btn-block{width:100%;}
+
+  label.field{display:block;margin-bottom:12px;}
+  label.field span{
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--muted);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  input[type=text], select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--chrome);
+    border-radius:8px;
+    padding:11px 12px;
+    font-size:15px;
+    font-family:inherit;
+  }
+  input[type=text]:focus, select:focus{outline:2px solid var(--flame);outline-offset:1px;}
+
+  .newtote-row{display:flex;gap:8px;}
+  .newtote-row input{flex:1;}
+
+  .badge{
+    display:inline-block;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--track-yellow);
+    font-size:11px;
+    font-weight:600;
+    padding:3px 8px;
+    border-radius:6px;
+    font-family:'Rajdhani',sans-serif;
+    letter-spacing:0.03em;
+  }
+
+  .toast{
+    position:fixed;
+    top:16px;left:50%;
+    transform:translateX(-50%) translateY(-140%);
+    background:var(--go);
+    color:#04170c;
+    font-weight:600;
+    font-size:14px;
+    padding:10px 18px;
+    border-radius:10px;
+    z-index:50;
+    transition:transform .25s ease;
+    max-width:90%;
+    text-align:center;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--stop);color:#210404;}
+
+  /* collection list */
+  .toolbar{display:flex;gap:8px;margin-bottom:14px;}
+  .toolbar input,.toolbar select{flex:1;}
+  .item-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:12px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-main .name{font-weight:600;font-size:15px;}
+  .item-main .meta{color:var(--muted);font-size:12px;margin-top:2px;}
+  .item-actions{display:flex;gap:6px;flex-shrink:0;}
+  .icon-btn{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--muted);
+    border-radius:8px;
+    width:32px;height:32px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .icon-btn.danger{color:var(--stop);}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px;}
+
+  /* totes grid */
+  .tote-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .tote-card{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    cursor:pointer;
+  }
+  .tote-card .count{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;color:var(--flame);}
+  .tote-card .label{font-size:13px;color:var(--chrome);margin-top:2px;font-weight:600;}
+
+  .section-title{font-size:12px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin:0 0 10px;font-weight:600;}
+
+  .footer-actions{display:flex;gap:8px;margin-top:16px;}
+
+  /* price check */
+  .price-panel{
+    margin-top:14px;
+    border-top:1px dashed var(--line);
+    padding-top:14px;
+  }
+  .price-panel.hidden{display:none;}
+  .price-head{display:flex;gap:12px;align-items:center;margin-bottom:12px;}
+  .price-head img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:8px;flex-shrink:0;}
+  .price-head .ptitle{font-size:13px;font-weight:600;line-height:1.3;}
+  .lowest-callout{
+    background:linear-gradient(135deg, rgba(61,220,132,0.15), rgba(61,220,132,0.04));
+    border:1px solid rgba(61,220,132,0.4);
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:12px;
+  }
+  .lowest-callout .amt{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;color:var(--go);}
+  .lowest-callout .src{font-size:12px;color:var(--muted);margin-top:2px;}
+  .offer-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line);
+    font-size:13px;text-decoration:none;color:var(--chrome);
+  }
+  .offer-row:last-child{border-bottom:none;}
+  .offer-row .merchant{font-weight:600;}
+  .offer-row .cond{color:var(--muted);font-size:11px;margin-left:6px;}
+  .offer-row .price{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--track-yellow);}
+  .offer-row.best .price{color:var(--go);}
+  .quicklinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .quicklinks a{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--chrome);
+    font-size:12px;font-weight:600;padding:8px 12px;border-radius:8px;
+    text-decoration:none;
+  }
+  .price-note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  .spinner-text{color:var(--muted);font-size:13px;padding:6px 0;}
+  .price-badge{
+    display:inline-block;background:rgba(61,220,132,0.12);
+    border:1px solid rgba(61,220,132,0.35);color:var(--go);
+    font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+    font-family:'Rajdhani',sans-serif;margin-left:4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MANNY'S <em>HOT WHEELS</em></h1>
+  <p>Scan it. Tote it. Track it.</p>
+  <div class="checker"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+</header>
+
+<main>
+
+  <!-- SCAN VIEW -->
+  <section id="view-scan" class="view active">
+    <div class="card">
+      <div class="scan-frame">
+        <div id="reader"></div>
+      </div>
+      <div class="scan-controls">
+        <button class="btn btn-flame btn-block" id="btnStartScan">Start Scanning</button>
+        <button class="btn btn-stop btn-block" id="btnStopScan" style="display:none;">Stop</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Item details</div>
+      <label class="field">
+        <span>Barcode (UPC)</span>
+        <input type="text" id="fBarcode" placeholder="Scan above or type manually" />
+      </label>
+      <button class="btn btn-ghost btn-block" id="btnCheckPrice" type="button">Compare Prices</button>
+
+      <div class="price-panel hidden" id="pricePanel"></div>
+
+      <label class="field" style="margin-top:16px;">
+        <span>Car name / series (optional)</span>
+        <input type="text" id="fName" placeholder="e.g. '67 Camaro — HW Flames" />
+      </label>
+      <label class="field">
+        <span>Tote / Location</span>
+        <select id="fTote"></select>
+      </label>
+      <div class="newtote-row" style="margin-bottom:12px;">
+        <input type="text" id="fNewTote" placeholder="Or create a new tote..." />
+        <button class="btn btn-ghost btn-sm" id="btnAddTote">Add</button>
+      </div>
+      <label class="field">
+        <span>Label / notes (optional)</span>
+        <input type="text" id="fLabel" placeholder="e.g. Shelf B, Treasure Hunt" />
+      </label>
+      <button class="btn btn-flame btn-block" id="btnSaveItem">Save to Collection</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Recently added</div>
+      <div id="recentList" class="empty">Nothing scanned yet.</div>
+    </div>
+  </section>
+
+  <!-- COLLECTION VIEW -->
+  <section id="view-collection" class="view">
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="Search name, barcode, label..." />
+      <select id="filterTote"><option value="">All totes</option></select>
+    </div>
+    <div class="card">
+      <div id="collectionList" class="empty">No items yet — scan something!</div>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-ghost btn-block" id="btnExport">Export Backup</button>
+      <button class="btn btn-ghost btn-block" id="btnImportTrigger">Import Backup</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+  </section>
+
+  <!-- TOTES VIEW -->
+  <section id="view-totes" class="view">
+    <div class="card">
+      <div class="section-title">Totes</div>
+      <div id="toteGrid" class="tote-grid"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Manage totes</div>
+      <div id="toteManageList"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-view="scan"><span class="dot"></span>Scan</button>
+  <button class="tab-btn" data-view="collection"><span class="dot"></span>Collection</button>
+  <button class="tab-btn" data-view="totes"><span class="dot"></span>Totes</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+/* ---------- storage: tiny IndexedDB wrapper ---------- */
+const DB_NAME = "mannys_hw_db";
+const DB_VER = 1;
+let db;
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e)=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains("items")){
+        const s = d.createObjectStore("items",{keyPath:"id"});
+        s.createIndex("tote","tote",{unique:false});
+      }
+      if(!d.objectStoreNames.contains("totes")){
+        d.createObjectStore("totes",{keyPath:"name"});
+      }
+    };
+    req.onsuccess = (e)=>{db=e.target.result; resolve(db);};
+    req.onerror = (e)=>reject(e);
+  });
+}
+function tx(store,mode){ return db.transaction(store,mode).objectStore(store); }
+function getAll(store){
+  return new Promise((resolve,reject)=>{
+    const r = tx(store,"readonly").getAll();
+    r.onsuccess=()=>resolve(r.result);
+    r.onerror=(e)=>reject(e);
+  });
+}
+function put(store,val){
+  return new Promise((resolve,reject)=>{
+    const r = tx(store,"readwrite").put(val);
+    r.onsuccess=()=>resolve();
+    r.onerror=(e)=>reject(e);
+  });
+}
+function del(store,key){
+  return new Promise((resolve,reject)=>{
+    const r = tx(store,"readwrite").delete(key);
+    r.onsuccess=()=>resolve();
+    r.onerror=(e)=>reject(e);
+  });
+}
+
+/* ---------- state ---------- */
+let items = [];
+let totes = [];
+let scanner = null;
+let scanning = false;
+
+/* ---------- toast ---------- */
+function toast(msg, isErr){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.toggle("err", !!isErr);
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-"+btn.dataset.view).classList.add("active");
+    if(btn.dataset.view==="collection") renderCollection();
+    if(btn.dataset.view==="totes") renderTotes();
+  });
+});
+
+/* ---------- totes ---------- */
+async function loadTotes(){
+  totes = await getAll("totes");
+  if(totes.length===0){
+    totes = [{name:"Unsorted"}];
+    await put("totes",{name:"Unsorted"});
+  }
+  refreshToteSelects();
+}
+function refreshToteSelects(){
+  const opts = totes.map(t=>`<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join("");
+  document.getElementById("fTote").innerHTML = opts;
+  document.getElementById("filterTote").innerHTML = `<option value="">All totes</option>` + opts;
+}
+document.getElementById("btnAddTote").addEventListener("click", async ()=>{
+  const input = document.getElementById("fNewTote");
+  const name = input.value.trim();
+  if(!name){ toast("Enter a tote name first", true); return; }
+  if(totes.find(t=>t.name.toLowerCase()===name.toLowerCase())){
+    toast("That tote already exists", true); return;
+  }
+  await put("totes",{name});
+  input.value="";
+  await loadTotes();
+  document.getElementById("fTote").value = name;
+  toast("Tote added: "+name);
+});
+
+/* ---------- items ---------- */
+async function loadItems(){
+  items = await getAll("items");
+  items.sort((a,b)=>b.createdAt-a.createdAt);
+}
+function escapeHtml(s){
+  return (s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+async function saveItem(){
+  const barcode = document.getElementById("fBarcode").value.trim();
+  const name = document.getElementById("fName").value.trim();
+  const tote = document.getElementById("fTote").value || "Unsorted";
+  const label = document.getElementById("fLabel").value.trim();
+  if(!barcode){ toast("Scan or enter a barcode first", true); return; }
+  const item = {
+    id: barcode + "_" + Date.now(),
+    barcode, name, tote, label,
+    createdAt: Date.now()
+  };
+  if(draftPrice && draftPrice.barcode === barcode && draftPrice.lowest != null){
+    item.lowestPrice = draftPrice.lowest;
+    item.lowestMerchant = draftPrice.lowestMerchant;
+    item.priceCheckedAt = draftPrice.checkedAt;
+  }
+  await put("items", item);
+  await loadItems();
+  renderRecent();
+  toast("Saved to "+tote);
+  document.getElementById("fBarcode").value="";
+  document.getElementById("fName").value="";
+  document.getElementById("fLabel").value="";
+  document.getElementById("pricePanel").classList.add("hidden");
+  document.getElementById("pricePanel").innerHTML="";
+  draftPrice = null;
+}
+document.getElementById("btnSaveItem").addEventListener("click", saveItem);
+
+async function deleteItem(id){
+  await del("items", id);
+  await loadItems();
+  renderRecent();
+  renderCollection();
+  renderTotes();
+}
+
+function renderRecent(){
+  const el = document.getElementById("recentList");
+  const recent = items.slice(0,5);
+  if(recent.length===0){ el.className="empty"; el.textContent="Nothing scanned yet."; return; }
+  el.className="";
+  el.innerHTML = recent.map(it=>itemRowHtml(it)).join("");
+  bindRowActions(el);
+}
+
+function itemRowHtml(it){
+  const priceBit = (it.lowestPrice!=null)
+    ? `<span class="price-badge">$${Number(it.lowestPrice).toFixed(2)}${it.lowestMerchant?(" · "+escapeHtml(it.lowestMerchant)):""}</span>`
+    : "";
+  return `<div class="item-row" data-id="${escapeHtml(it.id)}">
+    <div class="item-main">
+      <div class="name">${escapeHtml(it.name || it.barcode)}</div>
+      <div class="meta">${escapeHtml(it.barcode)} · <span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label)):""}${priceBit}</div>
+    </div>
+    <div class="item-actions">
+      <button class="icon-btn danger" data-action="del" title="Delete">✕</button>
+    </div>
+  </div>`;
+}
+function bindRowActions(container){
+  container.querySelectorAll('[data-action="del"]').forEach(btn=>{
+    btn.addEventListener("click",(e)=>{
+      const id = e.target.closest(".item-row").dataset.id;
+      if(confirm("Remove this item from the collection?")) deleteItem(id);
+    });
+  });
+}
+
+/* ---------- collection view ---------- */
+function renderCollection(){
+  const search = document.getElementById("searchBox").value.trim().toLowerCase();
+  const toteFilter = document.getElementById("filterTote").value;
+  let list = items.filter(it=>{
+    const matchesSearch = !search || (it.name||"").toLowerCase().includes(search)
+      || it.barcode.toLowerCase().includes(search)
+      || (it.label||"").toLowerCase().includes(search);
+    const matchesTote = !toteFilter || it.tote===toteFilter;
+    return matchesSearch && matchesTote;
+  });
+  const el = document.getElementById("collectionList");
+  if(list.length===0){ el.className="empty"; el.textContent="No items match."; return; }
+  el.className="";
+  el.innerHTML = list.map(it=>itemRowHtml(it)).join("");
+  bindRowActions(el);
+}
+document.getElementById("searchBox").addEventListener("input", renderCollection);
+document.getElementById("filterTote").addEventListener("change", renderCollection);
+
+/* ---------- totes view ---------- */
+function renderTotes(){
+  const counts = {};
+  items.forEach(it=>{ counts[it.tote] = (counts[it.tote]||0)+1; });
+  const grid = document.getElementById("toteGrid");
+  grid.innerHTML = totes.map(t=>`
+    <div class="tote-card" data-tote="${escapeHtml(t.name)}">
+      <div class="count">${counts[t.name]||0}</div>
+      <div class="label">${escapeHtml(t.name)}</div>
+    </div>`).join("");
+  grid.querySelectorAll(".tote-card").forEach(card=>{
+    card.addEventListener("click",()=>{
+      document.querySelector('[data-view="collection"]').click();
+      document.getElementById("filterTote").value = card.dataset.tote;
+      renderCollection();
+    });
+  });
+
+  const manage = document.getElementById("toteManageList");
+  manage.innerHTML = totes.map(t=>`
+    <div class="item-row">
+      <div class="item-main"><div class="name">${escapeHtml(t.name)}</div>
+      <div class="meta">${counts[t.name]||0} item(s)</div></div>
+      <div class="item-actions">
+        <button class="icon-btn danger" data-tote-del="${escapeHtml(t.name)}" title="Delete tote">✕</button>
+      </div>
+    </div>`).join("");
+  manage.querySelectorAll("[data-tote-del]").forEach(btn=>{
+    btn.addEventListener("click", async (e)=>{
+      const name = e.target.dataset.toteDel;
+      if(name==="Unsorted"){ toast("Can't delete the default tote", true); return; }
+      const inUse = items.some(it=>it.tote===name);
+      if(inUse){ toast("Move items out of this tote first", true); return; }
+      if(!confirm(`Delete tote "${name}"?`)) return;
+      await del("totes", name);
+      await loadTotes();
+      renderTotes();
+    });
+  });
+}
+
+/* ---------- export / import ---------- */
+document.getElementById("btnExport").addEventListener("click", ()=>{
+  const data = JSON.stringify({items, totes}, null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mannys-hot-wheels-backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById("btnImportTrigger").addEventListener("click", ()=>{
+  document.getElementById("importFile").click();
+});
+document.getElementById("importFile").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    for(const t of (data.totes||[])) await put("totes", t);
+    for(const it of (data.items||[])) await put("items", it);
+    await loadTotes();
+    await loadItems();
+    renderRecent(); renderCollection(); renderTotes();
+    toast("Backup imported");
+  }catch(err){
+    toast("Import failed — invalid file", true);
+  }
+  e.target.value="";
+});
+
+/* ---------- price comparison ---------- */
+let draftPrice = null;
+
+function searchLinks(query){
+  const q = encodeURIComponent(query);
+  return [
+    {label:"eBay — sold listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1`},
+    {label:"eBay — active listings", url:`https://www.ebay.com/sch/i.html?_nkw=${q}`},
+    {label:"Mercari", url:`https://www.mercari.com/search/?keyword=${q}`},
+    {label:"Google Shopping", url:`https://www.google.com/search?tbm=shop&q=${q}`}
+  ];
+}
+
+function quicklinksHtml(query){
+  return `<div class="quicklinks">${searchLinks(query).map(l=>`<a href="${l.url}" target="_blank" rel="noopener">${l.label} ↗</a>`).join("")}</div>`;
+}
+
+document.getElementById("btnCheckPrice").addEventListener("click", checkPrices);
+document.getElementById("fBarcode").addEventListener("input", ()=>{
+  draftPrice = null;
+  const panel = document.getElementById("pricePanel");
+  panel.classList.add("hidden");
+  panel.innerHTML = "";
+});
+
+async function checkPrices(){
+  const barcode = document.getElementById("fBarcode").value.trim();
+  const panel = document.getElementById("pricePanel");
+  if(!barcode){ toast("Scan or enter a barcode first", true); return; }
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `<div class="spinner-text">Checking sources for ${escapeHtml(barcode)}…</div>`;
+
+  let data = null;
+  let fetchFailed = false;
+  try{
+    const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+    data = await res.json();
+  }catch(err){
+    fetchFailed = true;
+  }
+
+  const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
+  const query = product && product.title ? product.title : ("Hot Wheels " + barcode);
+
+  if(!product){
+    draftPrice = null;
+    panel.innerHTML = `
+      <div class="price-note">
+        ${fetchFailed ? "Couldn't reach the product database (offline or blocked)." : "No listing found in the barcode database for this UPC."}
+        Try these sources directly instead — this is also the best way to check real collector value,
+        since resale price for rarer castings isn't in general product databases:
+      </div>
+      ${quicklinksHtml(query)}
+    `;
+    return;
+  }
+
+  // gather offers from multiple sources returned by the lookup
+  let offers = (product.offers || [])
+    .filter(o => o.price && Number(o.price) > 0)
+    .map(o => ({
+      merchant: o.merchant || "Unknown seller",
+      price: Number(o.price),
+      condition: o.condition || "",
+      link: o.link || null
+    }))
+    .sort((a,b)=>a.price - b.price);
+
+  const lowest = offers.length ? offers[0] : (product.lowest_recorded_price ? {merchant:"recorded low", price:Number(product.lowest_recorded_price)} : null);
+
+  if(lowest){
+    draftPrice = {
+      barcode,
+      lowest: lowest.price,
+      lowestMerchant: lowest.merchant,
+      checkedAt: Date.now()
+    };
+  } else {
+    draftPrice = null;
+  }
+
+  // auto-fill the name field if empty
+  const nameField = document.getElementById("fName");
+  if(!nameField.value.trim() && product.title){
+    nameField.value = product.title;
+  }
+
+  const imgHtml = product.images && product.images[0]
+    ? `<img src="${product.images[0]}" alt="" />` : "";
+
+  const offersHtml = offers.length
+    ? offers.map((o,i)=>`
+        <a class="offer-row${i===0?" best":""}" href="${o.link||"#"}" target="_blank" rel="noopener">
+          <span><span class="merchant">${escapeHtml(o.merchant)}</span>${o.condition?(`<span class="cond">${escapeHtml(o.condition)}</span>`):""}</span>
+          <span class="price">$${o.price.toFixed(2)}</span>
+        </a>`).join("")
+    : `<div class="price-note">No live seller offers returned for this UPC — only historical price range below.</div>`;
+
+  panel.innerHTML = `
+    <div class="price-head">
+      ${imgHtml}
+      <div class="ptitle">${escapeHtml(product.title || query)}</div>
+    </div>
+    ${lowest ? `
+      <div class="lowest-callout">
+        <div class="amt">$${lowest.price.toFixed(2)}</div>
+        <div class="src">Lowest found · ${escapeHtml(lowest.merchant)}</div>
+      </div>` : ""}
+    ${offersHtml}
+    <div class="price-note">
+      These prices reflect general retail/marketplace listings for this product, not
+      collector resale value — for rare castings, Treasure Hunts, or errors, check sold
+      eBay listings below for real market value.
+    </div>
+    ${quicklinksHtml(query)}
+  `;
+}
+
+/* ---------- scanner ---------- */
+document.getElementById("btnStartScan").addEventListener("click", startScan);
+document.getElementById("btnStopScan").addEventListener("click", stopScan);
+
+async function startScan(){
+  if(scanning) return;
+  scanner = new Html5Qrcode("reader", {
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8
+    ],
+    verbose:false
+  });
+  try{
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 150 } },
+      (decodedText)=>{
+        document.getElementById("fBarcode").value = decodedText;
+        toast("Scanned: "+decodedText);
+        if(navigator.vibrate) navigator.vibrate(80);
+      },
+      ()=>{ /* ignore per-frame scan failures */ }
+    );
+    scanning = true;
+    document.getElementById("btnStartScan").style.display="none";
+    document.getElementById("btnStopScan").style.display="block";
+  }catch(err){
+    toast("Camera unavailable: "+err, true);
+  }
+}
+async function stopScan(){
+  if(scanner && scanning){
+    await scanner.stop();
+    scanner.clear();
+    scanning = false;
+  }
+  document.getElementById("btnStartScan").style.display="block";
+  document.getElementById("btnStopScan").style.display="none";
+}
+
+/* ---------- init ---------- */
+(async function init(){
+  await openDB();
+  await loadTotes();
+  await loadItems();
+  renderRecent();
+  renderCollection();
+  renderTotes();
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
