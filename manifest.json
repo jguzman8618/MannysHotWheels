@@ -1,7 +1,7 @@
 {
   "name": "Manny's Hot Wheels",
   "short_name": "Manny's HW",
-  "description": "Scan and organize the Hot Wheels collection by tote and label.",
+  "description": "Photo-identify and organize the Hot Wheels collection by tote and label.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

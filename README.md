@@ -1,15 +1,19 @@
 # Manny's Hot Wheels — Setup Guide
 
-A barcode-scanning inventory app for tracking which tote/location each
-Hot Wheels car lives in. Runs as a web app, and can be packaged into a
-plain installable `.apk` for Android — no Play Store account or
-developer membership needed.
+A photo-identification inventory app for tracking which tote/location
+each Hot Wheels car lives in. Take a front/back photo, the app
+identifies the exact car (name, series, year, collector #, Treasure
+Hunt status) using AI, then you file it into a tote. Runs as a web
+app, and can be packaged into a plain installable `.apk` for Android —
+no Play Store account or developer membership needed.
 
 ## What's in this folder
-- `index.html` — the whole app (scanner, collection, totes)
+- `index.html` — the whole app (identification, pricing, collection, totes)
 - `manifest.json` — app name/icon/theme info
 - `service-worker.js` — makes it work offline once loaded
 - `icons/` — app icons
+- `worker/` — the backend that powers real pricing and AI identification
+  (see `worker/README.md` to set it up)
 
 Everything is stored **on the phone**, in the browser's local database
 (IndexedDB). Nothing is sent to a server. Use the **Export Backup**
@@ -68,7 +72,7 @@ added:
 2. Tap the **Share** icon (square with an arrow) in the toolbar.
 3. Tap **Add to Home Screen**, then **Add**.
 4. Launch it from the new Home Screen icon — it opens full-screen,
-   with its own icon, and the camera scanner and storage both work
+   with its own icon, and the camera and storage both work
    the same as on Android.
 
 This is a genuine one-time install, not a bookmark — it keeps working
@@ -83,15 +87,19 @@ covers the whole household — Android phones sideload the APK or add
 to Home Screen, iPhones just add to Home Screen from Safari.
 
 ## Using the app
-- **Scan tab** — tap Start Scanning, point the camera at the barcode.
-  It fills in the barcode automatically; add a name, pick or create a
-  tote, add an optional label, then Save.
+- **Scan tab** — take a front and/or back photo of the car, then tap
+  **Identify Car from Photos** (or just **Compare Prices**, which
+  identifies automatically if needed). Confirm the suggested name,
+  series, year, collector #, and Treasure Hunt status, pick or create
+  a tote, then Save. The label auto-generates once enough is known.
 - **Collection tab** — search and filter everything you've logged.
 - **Totes tab** — see counts per tote, tap a tote to jump to its items,
   rename/manage totes at the bottom.
 
 ## Notes
-- Barcode formats supported: UPC-A, UPC-E, EAN-13, EAN-8 (covers
-  standard US retail packaging).
-- If a specific card's barcode won't scan (glare, damage), just type
-  it into the Barcode field manually.
+- Identification and live pricing require the backend in `worker/` to
+  be deployed — see `worker/README.md`. Without it, you can still add
+  cars manually (type the name/series yourself) and organize by tote;
+  you just won't get automatic identification or real prices.
+- If a photo doesn't identify confidently, the app tells you rather
+  than guessing — type in what you can see instead.

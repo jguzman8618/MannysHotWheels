@@ -110,29 +110,6 @@
     margin-bottom:14px;
   }
 
-  /* scanner */
-  .scan-frame{
-    position:relative;
-    border-radius:var(--radius);
-    overflow:hidden;
-    border:2px solid var(--flame-dim);
-    background:#000;
-    aspect-ratio:1/1;
-  }
-  #reader{width:100%;height:100%;}
-  .scan-frame::before, .scan-frame::after{
-    content:"";
-    position:absolute;
-    width:26px;height:26px;
-    border-color:var(--flame);
-    border-style:solid;
-    z-index:5;
-    pointer-events:none;
-  }
-  .scan-frame::before{top:10px;left:10px;border-width:3px 0 0 3px;}
-  .scan-frame::after{bottom:10px;right:10px;border-width:0 3px 3px 0;}
-  .scan-controls{display:flex;gap:8px;margin-top:12px;}
-
   button.btn{
     font-family:'Rajdhani',sans-serif;
     font-weight:700;
@@ -391,7 +368,7 @@
 
 <header>
   <h1>MANNY'S <em>HOT WHEELS</em></h1>
-  <p>Scan it. Tote it. Track it.</p>
+  <p>Snap it. Tote it. Track it.</p>
   <div class="checker"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
 </header>
 
@@ -400,23 +377,8 @@
   <!-- SCAN VIEW -->
   <section id="view-scan" class="view active">
     <div class="card">
-      <div class="scan-frame">
-        <div id="reader"></div>
-      </div>
-      <div class="scan-controls">
-        <button class="btn btn-flame btn-block" id="btnStartScan">Start Scanning</button>
-        <button class="btn btn-stop btn-block" id="btnStopScan" style="display:none;">Stop</button>
-        <button class="btn btn-flame btn-block" id="btnScanNext" style="display:none;">Scan Next Item</button>
-      </div>
-    </div>
-
-    <div class="card">
       <div class="section-title">Item details</div>
       <div class="dupe-banner hidden" id="dupeBanner"></div>
-      <label class="field">
-        <span>Barcode (UPC)</span>
-        <input type="text" id="fBarcode" placeholder="Scan above or type manually" />
-      </label>
       <button class="btn btn-ghost btn-block" id="btnCheckPrice" type="button">Compare Prices</button>
 
       <div class="price-panel hidden" id="pricePanel"></div>
@@ -512,7 +474,7 @@
   <!-- COLLECTION VIEW -->
   <section id="view-collection" class="view">
     <div class="toolbar">
-      <input type="text" id="searchBox" placeholder="Search name, barcode, label..." />
+      <input type="text" id="searchBox" placeholder="Search name, series, label..." />
       <select id="filterTote"><option value="">All totes</option></select>
     </div>
     <div class="card">
@@ -547,7 +509,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 /* ---------- config ---------- */
@@ -559,7 +520,7 @@ const PRICE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /* ---------- storage: tiny IndexedDB wrapper ---------- */
 const DB_NAME = "mannys_hw_db";
-const DB_VER = 2;
+const DB_VER = 3;
 let db;
 
 function openDB(){
@@ -578,9 +539,13 @@ function openDB(){
       if(!d.objectStoreNames.contains("priceCache")){
         d.createObjectStore("priceCache",{keyPath:"query"});
       }
-      if(!d.objectStoreNames.contains("idCache")){
-        d.createObjectStore("idCache",{keyPath:"barcode"});
+      // v3: idCache is now keyed by identified car name, not barcode (the
+      // barcode scanner was removed — different castings shared barcodes,
+      // which made barcode a bad identity key). Rebuild the store cleanly.
+      if(d.objectStoreNames.contains("idCache")){
+        d.deleteObjectStore("idCache");
       }
+      d.createObjectStore("idCache",{keyPath:"name"});
     };
     req.onsuccess = (e)=>{db=e.target.result; resolve(db);};
     req.onerror = (e)=>reject(e);
@@ -619,8 +584,6 @@ function del(store,key){
 /* ---------- state ---------- */
 let items = [];
 let totes = [];
-let scanner = null;
-let scanning = false;
 
 /* ---------- toast ---------- */
 function toast(msg, isErr){
@@ -682,13 +645,12 @@ function escapeHtml(s){
 }
 async function saveItem(){
   const profile = readFormProfile();
-  const barcode = profile.barcode;
   const tote = document.getElementById("fTote").value || "Unsorted";
   const label = document.getElementById("fLabel").value.trim();
-  if(!barcode){ toast("Scan or enter a barcode first", true); return; }
+  if(!profile.name.trim()){ toast("Identify or name the car first", true); return; }
+  const itemId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+"_"+Math.random().toString(36).slice(2)));
   const item = {
-    id: barcode + "_" + Date.now(),
-    barcode, tote, label,
+    id: itemId, tote, label,
     name: profile.name,
     series: profile.series,
     year: profile.year,
@@ -698,7 +660,8 @@ async function saveItem(){
     treasureHunt: profile.treasureHunt,
     createdAt: Date.now()
   };
-  if(draftPrice && draftPrice.barcode === barcode && draftPrice.lowest != null){
+  const nameKey = profile.name.trim().toLowerCase();
+  if(draftPrice && draftPrice.nameKey === nameKey && draftPrice.lowest != null){
     item.lowestPrice = draftPrice.lowest;
     item.lowestMerchant = draftPrice.lowestMerchant;
     item.priceCheckedAt = draftPrice.checkedAt;
@@ -707,20 +670,19 @@ async function saveItem(){
   if(draftPhotos.back) item.photoBack = draftPhotos.back;
   await put("items", item);
 
-  // remember this barcode's identification permanently for next time it's scanned
-  if(profile.name || profile.series || profile.year || profile.collectorNum){
-    await put("idCache", {
-      barcode,
-      name: profile.name, series: profile.series, year: profile.year,
-      collectorNum: profile.collectorNum, variant: profile.variant,
-      tier: profile.tier, treasureHunt: profile.treasureHunt
-    });
-  }
+  // remember this casting's identification permanently, keyed by name —
+  // so identifying "Nissan Silvia S15" again later can reuse series/year/etc.
+  await put("idCache", {
+    name: nameKey,
+    series: profile.series, year: profile.year,
+    collectorNum: profile.collectorNum, variant: profile.variant,
+    tier: profile.tier, treasureHunt: profile.treasureHunt
+  });
 
   await loadItems();
   renderRecent();
   toast("Saved to "+tote);
-  ["fBarcode","fName","fSeries","fYear","fCollectorNum","fVariant","fLabel"].forEach(id=>{
+  ["fName","fSeries","fYear","fCollectorNum","fVariant","fLabel"].forEach(id=>{
     const el = document.getElementById(id);
     el.value = "";
     delete el.dataset.userEdited;
@@ -732,7 +694,6 @@ async function saveItem(){
   document.getElementById("dupeBanner").classList.add("hidden");
   draftPrice = null;
   resetPhotoSlots();
-  if(scanning) resumeScan();
 }
 document.getElementById("btnSaveItem").addEventListener("click", saveItem);
 
@@ -761,11 +722,12 @@ function itemRowHtml(it){
     ? `<img src="${it.photoFront}" alt="" class="row-thumb" />`
     : "";
   const thBit = it.treasureHunt ? `<span class="badge th-badge">TH</span>` : (it.tier ? `<span class="badge">${escapeHtml(it.tier)}</span>` : "");
+  const seriesBit = it.series ? escapeHtml(it.series) + " · " : "";
   return `<div class="item-row" data-id="${escapeHtml(it.id)}">
     ${thumb}
     <div class="item-main">
-      <div class="name">${escapeHtml(it.name || it.barcode)} ${thBit}</div>
-      <div class="meta">${escapeHtml(it.barcode)} · <span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label.split("\n")[0])):""}${priceBit}</div>
+      <div class="name">${escapeHtml(it.name || "Unnamed car")} ${thBit}</div>
+      <div class="meta">${seriesBit}<span class="badge">${escapeHtml(it.tote)}</span> ${it.label?("· "+escapeHtml(it.label.split("\n")[0])):""}${priceBit}</div>
     </div>
     <div class="item-actions">
       <button class="icon-btn danger" data-action="del" title="Delete">✕</button>
@@ -787,7 +749,6 @@ function renderCollection(){
   const toteFilter = document.getElementById("filterTote").value;
   let list = items.filter(it=>{
     const matchesSearch = !search || (it.name||"").toLowerCase().includes(search)
-      || it.barcode.toLowerCase().includes(search)
       || (it.label||"").toLowerCase().includes(search)
       || (it.series||"").toLowerCase().includes(search)
       || (it.collectorNum||"").toLowerCase().includes(search)
@@ -881,7 +842,6 @@ document.getElementById("importFile").addEventListener("change", async (e)=>{
 
 function readFormProfile(){
   return {
-    barcode: document.getElementById("fBarcode").value.trim(),
     name: document.getElementById("fName").value.trim(),
     series: document.getElementById("fSeries").value.trim(),
     year: document.getElementById("fYear").value.trim(),
@@ -907,12 +867,11 @@ function canonicalQueryString(profile){
   if(profile.treasureHunt) parts.push("Treasure Hunt");
   const built = parts.join(" ").trim();
   if(built !== "Hot Wheels") return built;
-  // nothing structured yet — fall back to whatever OCR caught, then barcode
+  // nothing structured yet — fall back to whatever OCR caught
   const ocrGuess = (profile.ocrText||"").split("\n").map(l=>l.trim())
     .filter(l=>l.length>=3 && l.length<=40 && /[a-zA-Z]/.test(l))
     .sort((a,b)=>b.length-a.length)[0];
-  if(ocrGuess) return "Hot Wheels " + ocrGuess;
-  return profile.barcode ? ("Hot Wheels " + profile.barcode) : "Hot Wheels";
+  return ocrGuess ? ("Hot Wheels " + ocrGuess) : "Hot Wheels";
 }
 
 function buildAutoLabel(profile){
@@ -997,28 +956,6 @@ async function shopProvider(query){
   }
 }
 
-// ---- provider: general retail lookup (Walmart/Target/etc. — real data,
-// via the same product database used for name auto-fill) ----
-async function otherRetailersProvider(barcode){
-  if(!barcode) return { available:false, results:[], product:null };
-  const data = await fetchJsonWithFallback(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
-  const product = (data && data.code === "OK" && data.items && data.items[0]) ? data.items[0] : null;
-  if(!product) return { available:false, results:[], product:null };
-  const results = (product.offers || [])
-    .filter(o => o.price && Number(o.price) > 0)
-    .map(o => ({
-      marketplace: o.merchant || "Unknown seller",
-      title: product.title || null,
-      price: Number(o.price),
-      shipping: 0,
-      totalCost: Number(o.price),
-      condition: o.condition || "",
-      url: o.link || null
-    }))
-    .sort((a,b)=>a.totalCost - b.totalCost);
-  return { available: results.length>0, results, product };
-}
-
 // Amazon fallback: link-only, used only when no real Amazon price was
 // found via Google Shopping. Never scraped, never faked as a price.
 function amazonLinkSlot(query){
@@ -1047,8 +984,7 @@ function median(nums){
   return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 
-// True if the profile has enough real signal to search marketplaces with —
-// actual words a listing title would contain, not just a barcode number.
+// True if the profile has enough real signal to search marketplaces with.
 function hasRealIdentification(profile){
   if(profile.name || profile.series || profile.variant) return true;
   if(profile.ocrText && profile.ocrText.trim().split("\n").some(l=>l.trim().length>=3 && /[a-zA-Z]/.test(l))) return true;
@@ -1057,64 +993,49 @@ function hasRealIdentification(profile){
 
 async function runPricingEngine(profile){
   let query = canonicalQueryString(profile);
-  let resolvedFromLookup = null;
   let identifyInfo = null; // surfaced to the UI when AI photo ID was used to resolve the query
 
-  // Nothing real to search with yet (no name/series/OCR) — the barcode
-  // alone usually only identifies an assortment, and searching eBay/Amazon
-  // for the literal digits returns unrelated junk. Resolve a real search
-  // term automatically, trying progressively: retailer title lookup, then
-  // AI photo identification (including a description-based estimate for
-  // customs) — never just give up and search garbage.
+  // Nothing real to search with yet (no name/series/OCR) — identify from
+  // photos automatically before ever giving up. Never search with nothing.
   if(!hasRealIdentification(profile)){
-    const lookup = await otherRetailersProvider(profile.barcode);
-    if(lookup.product && lookup.product.title){
-      query = "Hot Wheels " + lookup.product.title;
-      resolvedFromLookup = lookup;
-    } else {
-      const idData = await runIdentify(true); // silent — this is an automatic attempt, not a user-triggered one
-      if(idData){
-        if(idData.isCustom && idData.searchDescription){
-          query = "custom Hot Wheels " + idData.searchDescription;
-          identifyInfo = { isCustom:true, description: idData.searchDescription, confidence: idData.confidence };
-        } else if(idData.name){
-          query = ["Hot Wheels", idData.year, idData.name, idData.series, idData.variant].filter(Boolean).join(" ");
-          identifyInfo = { isCustom:false, name: idData.name, confidence: idData.confidence };
-        }
-        if(idData.name || idData.isCustom) showIdentifySuggestion(idData); // let the user see + confirm the fields too
+    const idData = await runIdentify(true); // silent — automatic attempt, not user-triggered
+    if(idData){
+      if(idData.isCustom && idData.searchDescription){
+        query = "custom Hot Wheels " + idData.searchDescription;
+        identifyInfo = { isCustom:true, description: idData.searchDescription, confidence: idData.confidence };
+      } else if(idData.name){
+        query = ["Hot Wheels", idData.year, idData.name, idData.series, idData.variant].filter(Boolean).join(" ");
+        identifyInfo = { isCustom:false, name: idData.name, confidence: idData.confidence };
       }
-      if(!identifyInfo){
-        // truly nothing to go on — no barcode match AND no usable photo yet.
-        // Not a dead end: tell the user the one concrete thing that unblocks it.
-        return {
-          slots: null,
-          needsPhoto: true,
-          stats: null,
-          productTitle: null,
-          productImage: null,
-          fromCache: false,
-          query
-        };
-      }
+      if(idData.name || idData.isCustom) showIdentifySuggestion(idData); // let the user see + confirm the fields too
+    }
+    if(!identifyInfo){
+      // truly nothing to go on — no manual info AND no usable photo yet.
+      // Not a dead end: tell the user the one concrete thing that unblocks it.
+      return {
+        slots: null,
+        needsPhoto: true,
+        stats: null,
+        productTitle: null,
+        productImage: null,
+        fromCache: false,
+        query
+      };
     }
   }
 
   const cached = await getCachedPricing(query);
   if(cached) return { ...cached, fromCache:true, query, identifyInfo };
 
-  // run every real data source in parallel — one slow/unavailable source
-  // never blocks the others (requirement: graceful degradation).
-  // If we already resolved the retailer lookup above (to get a real title),
-  // reuse it instead of calling it again.
-  const [ebayRes, shopRes, otherRes] = await Promise.allSettled([
+  // run both real data sources in parallel — one slow/unavailable source
+  // never blocks the other (graceful degradation)
+  const [ebayRes, shopRes] = await Promise.allSettled([
     ebayProvider(query),
-    shopProvider(query),
-    resolvedFromLookup ? Promise.resolve(resolvedFromLookup) : otherRetailersProvider(profile.barcode)
+    shopProvider(query)
   ]);
 
   const ebay = ebayRes.status === "fulfilled" ? ebayRes.value : { available:false, results:[] };
   const shop = shopRes.status === "fulfilled" ? shopRes.value : { available:false, results:[] };
-  const other = otherRes.status === "fulfilled" ? otherRes.value : { available:false, results:[], product:null };
 
   // slot 1: eBay — prefer the dedicated Browse API (most precise), fall
   // back to an eBay listing surfaced via Google Shopping if that's all we have
@@ -1128,14 +1049,12 @@ async function runPricingEngine(profile){
   const shopAmazon = shop.results.find(r => /amazon/i.test(r.marketplace));
   const slot2 = shopAmazon || amazonLinkSlot(query);
 
-  // slots 3-5: three lowest verified prices from everything else —
-  // merge Google Shopping (minus whatever filled slots 1/2) with the
-  // retailer-lookup results, dedupe by marketplace+price, sort, take 3
+  // slots 3-5: three lowest verified prices from everything else Google
+  // Shopping surfaced (Walmart/Target/other sellers), minus what filled 1/2
   const usedShopUrls = new Set([shopEbay && shopEbay.url, shopAmazon && shopAmazon.url].filter(Boolean));
   const remainingShop = shop.results.filter(r => !usedShopUrls.has(r.url) && !/ebay|amazon/i.test(r.marketplace));
-  const merged = [...remainingShop, ...other.results];
   const seen = new Set();
-  const deduped = merged.filter(r=>{
+  const deduped = remainingShop.filter(r=>{
     const key = r.marketplace + "|" + r.totalCost;
     if(seen.has(key)) return false;
     seen.add(key); return true;
@@ -1158,11 +1077,13 @@ async function runPricingEngine(profile){
     median: median(numericPrices)
   } : null;
 
+  const anyShopResult = shopEbay || shopAmazon || remainingShop[0] || null;
+
   const payload = {
     slots: [slot1, slot2, ...slots345],
     stats,
-    productTitle: other.product ? other.product.title : null,
-    productImage: (other.product && other.product.images && other.product.images[0]) || null,
+    productTitle: (anyShopResult && anyShopResult.title) || profile.name || null,
+    productImage: (anyShopResult && anyShopResult.image) || null,
     identifyInfo
   };
 
@@ -1187,7 +1108,7 @@ function offerRowHtml(o){
 }
 
 document.getElementById("btnCheckPrice").addEventListener("click", checkPrices);
-document.getElementById("fBarcode").addEventListener("input", async ()=>{
+document.getElementById("fName").addEventListener("input", async ()=>{
   draftPrice = null;
   const panel = document.getElementById("pricePanel");
   panel.classList.add("hidden");
@@ -1197,26 +1118,27 @@ document.getElementById("fBarcode").addEventListener("input", async ()=>{
 });
 
 function checkDuplicate(){
-  const barcode = document.getElementById("fBarcode").value.trim();
+  const name = document.getElementById("fName").value.trim();
   const banner = document.getElementById("dupeBanner");
-  if(!barcode){ banner.classList.add("hidden"); return; }
-  const matches = items.filter(it=>it.barcode===barcode);
+  if(!name){ banner.classList.add("hidden"); return; }
+  const nameKey = name.toLowerCase();
+  const matches = items.filter(it=>(it.name||"").trim().toLowerCase()===nameKey);
   if(matches.length===0){ banner.classList.add("hidden"); return; }
   const totesList = [...new Set(matches.map(m=>m.tote))].join(", ");
-  banner.innerHTML = `⚠️ Already in your collection (${matches.length}) — in <b>${escapeHtml(totesList)}</b>. Search "${escapeHtml(barcode)}" in Collection to see it.`;
+  banner.innerHTML = `⚠️ Already in your collection (${matches.length}) — in <b>${escapeHtml(totesList)}</b>. Search "${escapeHtml(name)}" in Collection to see it.`;
   banner.classList.remove("hidden");
 }
 
-// Permanent ID cache: once a barcode's identification fields have been
-// confirmed (saved) once, prefill them automatically next time it's scanned.
+// Permanent ID cache: once a casting's identification fields have been
+// confirmed (saved) once, prefill them automatically next time that same
+// name is entered or identified again.
 async function maybeApplyIdCache(){
-  const barcode = document.getElementById("fBarcode").value.trim();
-  if(!barcode) return;
+  const name = document.getElementById("fName").value.trim();
+  if(!name) return;
   try{
-    const cached = await getOne("idCache", barcode);
+    const cached = await getOne("idCache", name.toLowerCase());
     if(!cached) return;
     const setIfEmpty = (id,val)=>{ const el=document.getElementById(id); if(val && !el.value) el.value = val; };
-    setIfEmpty("fName", cached.name);
     setIfEmpty("fSeries", cached.series);
     setIfEmpty("fYear", cached.year);
     setIfEmpty("fCollectorNum", cached.collectorNum);
@@ -1224,14 +1146,13 @@ async function maybeApplyIdCache(){
     if(cached.tier && !document.getElementById("fTier").value) document.getElementById("fTier").value = cached.tier;
     if(cached.treasureHunt) document.getElementById("fTreasureHunt").checked = true;
     maybeAutoLabel();
-    toast("Filled in from a previous scan of this barcode");
+    toast("Filled in from a previous entry of this car");
   }catch(err){ /* no cache entry — fine */ }
 }
 
 async function checkPrices(){
   const profile = readFormProfile();
   const panel = document.getElementById("pricePanel");
-  if(!profile.barcode){ toast("Scan or enter a barcode first", true); return; }
 
   panel.classList.remove("hidden");
   panel.innerHTML = `<div class="spinner-text">Identifying the car and checking sources…</div>`;
@@ -1241,8 +1162,8 @@ async function checkPrices(){
   if(result.needsPhoto){
     panel.innerHTML = `
       <div class="price-note identify-first">
-        This barcode only identifies the assortment, and there's no photo yet to identify
-        the specific car from. <strong>Take a front or back photo</strong> above, then tap
+        Nothing to identify this car with yet.
+        <strong>Take a front or back photo</strong> above, then tap
         Compare Prices again — it'll identify it automatically and search from there.
       </div>`;
     draftPrice = null;
@@ -1263,10 +1184,14 @@ async function checkPrices(){
   ) : "";
 
   const [slot1, slot2, ...rest] = result.slots;
+  const nameForKey = document.getElementById("fName").value.trim()
+    || (result.identifyInfo && result.identifyInfo.name)
+    || result.productTitle || "";
+  const nameKey = nameForKey.trim().toLowerCase();
   draftPrice = (slot1 && slot1.totalCost!=null)
-    ? { barcode: profile.barcode, lowest: slot1.totalCost, lowestMerchant: "eBay", checkedAt: Date.now() }
+    ? { nameKey, lowest: slot1.totalCost, lowestMerchant: "eBay", checkedAt: Date.now() }
     : (rest.find(s=>s.totalCost!=null)
-        ? { barcode: profile.barcode, lowest: rest.find(s=>s.totalCost!=null).totalCost, lowestMerchant: rest.find(s=>s.totalCost!=null).marketplace, checkedAt: Date.now() }
+        ? { nameKey, lowest: rest.find(s=>s.totalCost!=null).totalCost, lowestMerchant: rest.find(s=>s.totalCost!=null).marketplace, checkedAt: Date.now() }
         : null);
 
   const imgHtml = result.productImage ? `<img src="${result.productImage}" alt="" />` : "";
@@ -1513,8 +1438,7 @@ async function runIdentify(silent){
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify({
         front: stripPrefix(draftPhotos.front),
-        back: stripPrefix(draftPhotos.back),
-        barcode: document.getElementById("fBarcode").value.trim()
+        back: stripPrefix(draftPhotos.back)
       })
     });
     const data = await res.json();
@@ -1577,72 +1501,9 @@ document.getElementById("btnUseIdentify").addEventListener("click", ()=>{
   if(d.treasureHunt) document.getElementById("fTreasureHunt").checked = true;
   document.getElementById("identifySuggest").classList.add("hidden");
   maybeAutoLabel();
+  checkDuplicate();
   toast("Filled in from photo identification");
 });
-
-/* ---------- scanner ---------- */
-document.getElementById("btnStartScan").addEventListener("click", startScan);
-document.getElementById("btnStopScan").addEventListener("click", stopScan);
-document.getElementById("btnScanNext").addEventListener("click", resumeScan);
-
-async function startScan(){
-  if(scanning) return;
-  try{
-    scanner = new Html5Qrcode("reader", {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8
-      ],
-      verbose:false
-    });
-    await scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      (decodedText)=>{
-        document.getElementById("fBarcode").value = decodedText;
-        toast("Scanned: "+decodedText);
-        if(navigator.vibrate) navigator.vibrate(80);
-        checkDuplicate();
-        maybeApplyIdCache().then(checkPrices);
-        freezeScan();
-      },
-      ()=>{ /* ignore per-frame scan failures */ }
-    );
-    scanning = true;
-    document.getElementById("btnStartScan").style.display="none";
-    document.getElementById("btnStopScan").style.display="block";
-    document.getElementById("btnScanNext").style.display="none";
-  }catch(err){
-    toast("Camera unavailable: "+err, true);
-  }
-}
-
-function freezeScan(){
-  if(!scanner || !scanning) return;
-  try{ scanner.pause(true); }catch(err){ /* pause not supported — keep scanning live */ }
-  document.getElementById("btnStopScan").style.display="none";
-  document.getElementById("btnScanNext").style.display="block";
-}
-
-function resumeScan(){
-  if(!scanner) return;
-  try{ scanner.resume(); }catch(err){ /* ignore */ }
-  document.getElementById("btnScanNext").style.display="none";
-  document.getElementById("btnStopScan").style.display="block";
-}
-
-async function stopScan(){
-  if(scanner && scanning){
-    await scanner.stop();
-    scanner.clear();
-    scanning = false;
-  }
-  document.getElementById("btnStartScan").style.display="block";
-  document.getElementById("btnStopScan").style.display="none";
-  document.getElementById("btnScanNext").style.display="none";
-}
 
 /* ---------- init ---------- */
 (async function init(){
